@@ -1,0 +1,13 @@
+/.buildpath
+/.project
+/.settings
+/.idea
+/bin
+/build
+/phpunit.xml
+/tools
+/vendor
+cache.properties
+string_def.txt
+.phpunit.result.cache
+.php_cs.cache

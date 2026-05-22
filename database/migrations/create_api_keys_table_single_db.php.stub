@@ -1,0 +1,67 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Single-DB tenancy migration.
+ * Use this stub when KEYSTONE_TENANCY_MODE=single_db.
+ * Publish via: php artisan vendor:publish --tag=keystone-migrations-single-db
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        $table     = config('keystone.table', 'api_keys');
+        $tenantCol = config('keystone.tenancy.tenant_id_column', 'tenant_id');
+
+        Schema::create($table, function (Blueprint $table) use ($tenantCol): void {
+            $table->id();
+
+            // Tenant identifier — populated automatically via TenantAware trait
+            $table->string($tenantCol)->index();
+
+            // Polymorphic owner — any Eloquent model that uses HasApiKeys
+            $table->string('keystoneable_type');
+            $table->unsignedBigInteger('keystoneable_id');
+
+            // Human-readable label
+            $table->string('name');
+
+            // Plain API key — used to identify the record on incoming requests
+            $table->string('api_key', 80)->unique();
+
+            // Plain secret key — used as the HMAC-SHA256 signing secret
+            $table->string('secret_key', 80);
+
+            // Optional JSON array of allowed scopes, e.g. ["read","write"]
+            $table->json('scopes')->nullable();
+
+            // Optional expiry timestamp
+            $table->timestamp('expires_at')->nullable();
+
+            // Usage tracking — written asynchronously in middleware terminate()
+            $table->timestamp('last_used_at')->nullable();
+            $table->string('last_used_ip', 45)->nullable();
+
+            // Soft-revocation — non-null means the key is rejected
+            $table->timestamp('revoked_at')->nullable();
+
+            $table->timestamps();
+
+            $table->index(['keystoneable_type', 'keystoneable_id'], 'api_keys_keystoneable_index');
+
+            // Composite index optimises the most common query:
+            // WHERE tenant_id = ? AND api_key = ?
+            $table->index([$tenantCol, 'api_key'], 'api_keys_tenant_key_index');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(config('keystone.table', 'api_keys'));
+    }
+};

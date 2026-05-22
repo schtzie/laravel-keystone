@@ -1,0 +1,79 @@
+{
+    "name": "schatzie/laravel-keystone",
+    "description": "API key management for Laravel — attach API keys to any Eloquent model, authenticate requests via HMAC SHA-256, cache keys in Redis, and support stancl/tenancy v4 multi-tenant architectures.",
+    "keywords": [
+        "laravel",
+        "api-key",
+        "authentication",
+        "multi-tenancy",
+        "redis",
+        "hmac"
+    ],
+    "homepage": "https://github.com/schtzie/laravel-keystone",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Schatzie"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/contracts": "^11.0|^12.0|^13.0",
+        "illuminate/database": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0",
+        "illuminate/redis": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0"
+    },
+    "suggest": {
+        "predis/predis": "Required when using the Redis cache store without the PHP Redis extension (^2.0).",
+        "stancl/tenancy": "Required for multi-tenant support via stancl/tenancy v4 (^4.0)."
+    },
+    "require-dev": {
+        "captainhook/captainhook-phar": "^5.27",
+        "inertiajs/inertia-laravel": "^2.0",
+        "larastan/larastan": "^3.8.1",
+        "laravel/pint": "^1.26.0",
+        "orchestra/testbench": "^9.0|^10.8|^11.0",
+        "pestphp/pest": "^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0",
+        "ramsey/conventional-commits": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Schatzie\\Keystone\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Schatzie\\Keystone\\Tests\\": "tests/",
+            "Schatzie\\Keystone\\Tests\\Support\\": "tests/Support/"
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "test-coverage": "pest --coverage",
+        "analyse": "phpstan analyse --memory-limit=-1",
+        "analyse-baseline": "phpstan analyse --memory-limit=-1 --generate-baseline",
+        "pint": "vendor/bin/pint",
+        "install-hooks": "vendor/bin/captainhook install --only-enabled"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Schatzie\\Keystone\\KeystoneServiceProvider"
+            ],
+            "aliases": {
+                "Keystone": "Schatzie\\Keystone\\Facades\\Keystone"
+            }
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "captainhook/captainhook-phar": true,
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

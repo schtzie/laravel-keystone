@@ -1,0 +1,32 @@
+{
+  "name" : "phar-io/gnupg",
+  "description" : "Thin GnuPG wrapper class around the gnupg binary, mimicking the pecl/gnupg api",
+  "license" : "BSD-3-Clause",
+  "authors" : [
+    {
+      "name" : "Arne Blankerts",
+      "email" : "arne@blankerts.de",
+      "role" : "Developer"
+    },
+    {
+      "name" : "Sebastian Heuer",
+      "email" : "sebastian@phpeople.de",
+      "role" : "Developer"
+    }
+  ],
+  "support" : {
+    "issues" : "https://github.com/phar-io/gnupg/issues"
+  },
+  "require" : {
+    "php" : "^7.2||^8.0",
+    "phar-io/executor" : "^1.0",
+    "phar-io/filesystem": "^2.0"
+  },
+  "autoload": {
+    "classmap": [
+      "src/"
+    ]
+  },
+  "minimum-stability" : "dev",
+  "prefer-stable" : true
+}

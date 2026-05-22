@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="Laravel Keystone Test Suite">
+            <file>tests/Feature/ApiKeyTest.php</file>
+            <file>tests/Feature/CacheTest.php</file>
+            <file>tests/Feature/SingleDbTenancyTest.php</file>
+            <file>tests/Feature/MultiDbTenancyTest.php</file>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>./src</directory>
+        </include>
+    </source>
+</phpunit>
