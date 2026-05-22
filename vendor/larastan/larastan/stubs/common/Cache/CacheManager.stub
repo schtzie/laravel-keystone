@@ -1,9 +1,0 @@
-<?php
-
-namespace Illuminate\Cache;
-
-/**
- * @mixin \Illuminate\Cache\Repository
- * @mixin \Illuminate\Contracts\Cache\LockProvider
- */
-class CacheManager implements \Illuminate\Contracts\Cache\Factory {}

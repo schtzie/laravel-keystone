@@ -1,5 +1,0 @@
-/vendor/
-/.phpunit.cache/
-composer.lock
-/.php_cs.cache
-/tools/
