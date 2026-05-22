@@ -52,7 +52,7 @@ class ApiKey extends Model
     /**
      * Polymorphic owner — any model using the HasApiKeys trait.
      *
-     * @return MorphTo<Model, self>
+     * @return MorphTo<Model, $this>
      */
     public function keystoneable(): MorphTo
     {
