@@ -4,11 +4,8 @@
          bootstrap="tests/bootstrap.php"
          colors="true">
     <testsuites>
-        <testsuite name="Laravel Keystone Test Suite">
-            <file>tests/Feature/ApiKeyTest.php</file>
-            <file>tests/Feature/CacheTest.php</file>
-            <file>tests/Feature/SingleDbTenancyTest.php</file>
-            <file>tests/Feature/MultiDbTenancyTest.php</file>
+        <testsuite name="Laravel Keystone Feature Test Suite">
+            <directory>tests/Feature</directory>
         </testsuite>
     </testsuites>
     <source>
