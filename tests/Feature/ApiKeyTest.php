@@ -19,7 +19,7 @@ function makeSignature(string $apiKey, string $secretKey): string
 
 function keystoneRoute(string ...$scopes): void
 {
-    $middleware = $scopes === [] ? 'api.key' : 'api.key:' . implode(',', $scopes);
+    $middleware = $scopes === [] ? 'api.key' : 'api.key:'.implode(',', $scopes);
 
     Route::middleware($middleware)->get('/test-keystone', function () {
         $owner = request()->attributes->get('keystoneable');
@@ -31,24 +31,24 @@ function keystoneRoute(string ...$scopes): void
 // ── Key Generation & Storage ───────────────────────────────────────────────
 
 it('createApiKey returns plain api_key, secret_key, and the model', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     expect($result)->toHaveKeys(['api_key', 'secret_key', 'model'])
         ->and($result['api_key'])->toStartWith('ks_')
         ->and($result['secret_key'])->not->toBeEmpty()
-        ->and($result['model'])->toBeInstanceOf(\Schatzie\Keystone\Models\ApiKey::class);
+        ->and($result['model'])->toBeInstanceOf(Schatzie\Keystone\Models\ApiKey::class);
 });
 
 it('stores the plain api_key in the database', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $this->assertDatabaseHas('api_keys', ['api_key' => $result['api_key']]);
 });
 
 it('stores the plain secret_key in the database', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $this->assertDatabaseHas('api_keys', ['secret_key' => $result['secret_key']]);
@@ -65,7 +65,7 @@ it('creates multiple keys for the same owner', function (): void {
 // ── HMAC Signature Verification ────────────────────────────────────────────
 
 it('verifySignature passes for the correct HMAC', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $sig = makeSignature($result['api_key'], $result['secret_key']);
@@ -74,14 +74,14 @@ it('verifySignature passes for the correct HMAC', function (): void {
 });
 
 it('verifySignature fails for a tampered signature', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     expect($result['model']->verifySignature('tampered-signature'))->toBeFalse();
 });
 
 it('verifySignature fails when signed with the wrong secret', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $sig = makeSignature($result['api_key'], 'wrong-secret');
@@ -93,13 +93,13 @@ it('verifySignature fails when signed with the wrong secret', function (): void 
 
 it('middleware allows a valid api_key with correct HMAC signature', function (): void {
     keystoneRoute();
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $sig = makeSignature($result['api_key'], $result['secret_key']);
 
     $response = $this->getJson('/test-keystone', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ]);
 
@@ -116,7 +116,7 @@ it('middleware returns 401 when api_key header is missing', function (): void {
 
 it('middleware returns 401 when signature header is missing', function (): void {
     keystoneRoute();
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $this->getJson('/test-keystone', ['X-API-Key' => $result['api_key']])
@@ -125,11 +125,11 @@ it('middleware returns 401 when signature header is missing', function (): void 
 
 it('middleware returns 401 for a wrong HMAC signature', function (): void {
     keystoneRoute();
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $this->getJson('/test-keystone', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => 'bad-signature',
     ])->assertUnauthorized();
 });
@@ -138,34 +138,34 @@ it('middleware returns 401 for an unknown api_key', function (): void {
     keystoneRoute();
 
     $this->getJson('/test-keystone', [
-        'X-API-Key'       => 'ks_unknown',
+        'X-API-Key' => 'ks_unknown',
         'X-API-Signature' => 'irrelevant',
     ])->assertUnauthorized();
 });
 
 it('middleware returns 401 for an expired key', function (): void {
     keystoneRoute();
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App', [], now()->subDay()->toImmutable());
 
     $sig = makeSignature($result['api_key'], $result['secret_key']);
 
     $this->getJson('/test-keystone', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ])->assertUnauthorized();
 });
 
 it('middleware returns 401 for a revoked key', function (): void {
     keystoneRoute();
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
     $result['model']->revoke();
 
     $sig = makeSignature($result['api_key'], $result['secret_key']);
 
     $this->getJson('/test-keystone', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ])->assertUnauthorized();
 });
@@ -174,26 +174,26 @@ it('middleware returns 401 for a revoked key', function (): void {
 
 it('middleware allows a request when the key has the required scope', function (): void {
     keystoneRoute('read');
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App', ['read', 'write']);
 
     $sig = makeSignature($result['api_key'], $result['secret_key']);
 
     $this->getJson('/test-keystone', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ])->assertOk();
 });
 
 it('middleware returns 401 when the key is missing a required scope', function (): void {
     keystoneRoute('write');
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App', ['read']); // no 'write'
 
     $sig = makeSignature($result['api_key'], $result['secret_key']);
 
     $this->getJson('/test-keystone', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ])->assertUnauthorized();
 });
@@ -206,33 +206,33 @@ it('middleware binds the keystoneable owner on request attributes', function ():
 
         return response()->json([
             'class' => get_class($owner),
-            'id'    => $owner->getKey(),
+            'id' => $owner->getKey(),
         ]);
     });
 
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
-    $sig    = makeSignature($result['api_key'], $result['secret_key']);
+    $sig = makeSignature($result['api_key'], $result['secret_key']);
 
     $this->getJson('/test-owner', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ])->assertOk()->assertJson([
         'class' => User::class,
-        'id'    => $user->getKey(),
+        'id' => $user->getKey(),
     ]);
 });
 
 // ── Key Lifecycle ──────────────────────────────────────────────────────────
 
 it('revokeApiKey marks the key as revoked', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $user->revokeApiKey($result['model']);
 
     $this->assertDatabaseHas('api_keys', [
-        'id'         => $result['model']->id,
+        'id' => $result['model']->id,
         'revoked_at' => now()->toDateTimeString(),
     ]);
 });
@@ -249,7 +249,7 @@ it('revokeAllApiKeys revokes every active key', function (): void {
 });
 
 it('rotateApiKey revokes the old key and returns a new one', function (): void {
-    $user   = makeUser();
+    $user = makeUser();
     $result = $user->createApiKey('My App');
 
     $rotated = $user->rotateApiKey($result['model']);

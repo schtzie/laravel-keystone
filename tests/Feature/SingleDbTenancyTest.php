@@ -13,7 +13,7 @@ use Schatzie\Keystone\Tests\Support\FakeTenant;
 
 beforeEach(function (): void {
     config([
-        'keystone.tenancy.mode'             => 'single_db',
+        'keystone.tenancy.mode' => 'single_db',
         'keystone.tenancy.tenant_id_column' => 'tenant_id',
     ]);
 
@@ -46,11 +46,11 @@ afterEach(function (): void {
 it('stamps tenant_id on the api_key record when creating', function (): void {
     FakeTenant::set('tenant-a');
 
-    $user   = User::create(['name' => 'Tenant A User']);
+    $user = User::create(['name' => 'Tenant A User']);
     $result = $user->createApiKey('Tenant A Key');
 
     $this->assertDatabaseHas('api_keys', [
-        'api_key'   => $result['api_key'],
+        'api_key' => $result['api_key'],
         'tenant_id' => 'tenant-a',
     ]);
 });
@@ -69,15 +69,15 @@ it('does not return keys from another tenant', function (): void {
 
 it('namespaces Redis cache keys by tenant_id in single_db mode', function (): void {
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'Cache Tenant A']);
+    $user = User::create(['name' => 'Cache Tenant A']);
     $result = $user->createApiKey('Key A');
 
     $repo = app(ApiKeyCacheRepository::class);
     $repo->put($result['model']);
 
     // Cache key must include the tenant segment
-    $cache     = app('cache')->store('array');
-    $tenantKey = 'keystone:tenant-a:key:' . $result['api_key'];
+    $cache = app('cache')->store('array');
+    $tenantKey = 'keystone:tenant-a:key:'.$result['api_key'];
     expect($cache->has($tenantKey))->toBeTrue();
 });
 
@@ -86,7 +86,7 @@ it('middleware rejects a key that belongs to a different tenant', function (): v
 
     // Create key under tenant-a
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'Tenant A']);
+    $user = User::create(['name' => 'Tenant A']);
     $result = $user->createApiKey('Key A');
     FakeTenant::clear();
 
@@ -96,7 +96,7 @@ it('middleware rejects a key that belongs to a different tenant', function (): v
     $sig = hash_hmac('sha256', $result['api_key'], $result['secret_key']);
 
     $this->getJson('/single-db-test', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ])->assertUnauthorized();
 });

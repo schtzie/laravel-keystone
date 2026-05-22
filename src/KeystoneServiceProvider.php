@@ -19,7 +19,7 @@ final class KeystoneServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/keystone.php',
+            __DIR__.'/../config/keystone.php',
             'keystone',
         );
 
@@ -61,19 +61,17 @@ final class KeystoneServiceProvider extends ServiceProvider
 
         // Config
         $this->publishes([
-            __DIR__ . '/../config/keystone.php' => config_path('keystone.php'),
+            __DIR__.'/../config/keystone.php' => config_path('keystone.php'),
         ], 'keystone-config');
 
         // Base migration (none / multi_db modes)
         $this->publishes([
-            __DIR__ . '/../database/migrations/create_api_keys_table.php.stub' =>
-                database_path('migrations/' . date('Y_m_d_His') . '_create_api_keys_table.php'),
+            __DIR__.'/../database/migrations/create_api_keys_table.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_api_keys_table.php'),
         ], 'keystone-migrations');
 
         // Single-DB migration (single_db mode)
         $this->publishes([
-            __DIR__ . '/../database/migrations/create_api_keys_table_single_db.php.stub' =>
-                database_path('migrations/' . date('Y_m_d_His') . '_create_api_keys_table.php'),
+            __DIR__.'/../database/migrations/create_api_keys_table_single_db.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_api_keys_table.php'),
         ], 'keystone-migrations-single-db');
     }
 

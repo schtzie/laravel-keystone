@@ -12,20 +12,20 @@ use Illuminate\Http\Request;
 use Schatzie\Keystone\Tenancy\Concerns\TenantAware;
 
 /**
- * @property int         $id
- * @property string      $keystoneable_type
- * @property int|string  $keystoneable_id
+ * @property int $id
+ * @property string $keystoneable_type
+ * @property int|string $keystoneable_id
  * @property string|null $tenant_id
- * @property string      $name
- * @property string      $api_key
- * @property string      $secret_key
- * @property array|null  $scopes
+ * @property string $name
+ * @property string $api_key
+ * @property string $secret_key
+ * @property array|null $scopes
  * @property CarbonImmutable|null $expires_at
  * @property CarbonImmutable|null $last_used_at
  * @property string|null $last_used_ip
  * @property CarbonImmutable|null $revoked_at
- * @property CarbonImmutable      $created_at
- * @property CarbonImmutable      $updated_at
+ * @property CarbonImmutable $created_at
+ * @property CarbonImmutable $updated_at
  */
 class ApiKey extends Model
 {
@@ -36,10 +36,10 @@ class ApiKey extends Model
 
     /** @var array<string, string> */
     protected $casts = [
-        'scopes'       => 'array',
-        'expires_at'   => 'immutable_datetime',
+        'scopes' => 'array',
+        'expires_at' => 'immutable_datetime',
         'last_used_at' => 'immutable_datetime',
-        'revoked_at'   => 'immutable_datetime',
+        'revoked_at' => 'immutable_datetime',
     ];
 
     public function getTable(): string

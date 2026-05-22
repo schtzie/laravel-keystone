@@ -34,37 +34,6 @@ final class ApiKeyCacheRepository
         private readonly ?int $ttl,
     ) {}
 
-    // ── Namespace helpers ──────────────────────────────────────────────────
-
-    /**
-     * Returns a tenant-specific segment for Redis key construction.
-     * Empty string when tenancy is disabled or not yet initialised.
-     */
-    private function tenantSegment(): string
-    {
-        $mode = config('keystone.tenancy.mode', 'none');
-
-        if ($mode === 'none') {
-            return '';
-        }
-
-        if (! function_exists('tenant') || tenant() === null) {
-            return '';
-        }
-
-        return (string) tenant()->getTenantKey() . ':';
-    }
-
-    private function keyFor(string $apiKey): string
-    {
-        return $this->prefix . ':' . $this->tenantSegment() . 'key:' . $apiKey;
-    }
-
-    private function ownerKeyFor(string $type, int|string $id): string
-    {
-        return $this->prefix . ':' . $this->tenantSegment() . 'owner:' . $type . ':' . $id;
-    }
-
     // ── Public API ─────────────────────────────────────────────────────────
 
     /**
@@ -102,7 +71,7 @@ final class ApiKeyCacheRepository
             return;
         }
 
-        $keyEntry   = $this->keyFor($apiKey->api_key);
+        $keyEntry = $this->keyFor($apiKey->api_key);
         $ownerEntry = $this->ownerKeyFor($apiKey->keystoneable_type, $apiKey->keystoneable_id);
 
         // Serialise model attributes (no relations)
@@ -160,5 +129,36 @@ final class ApiKeyCacheRepository
         // we do a best-effort forget using the known prefix. For production
         // Redis, callers should prefer per-key or per-owner invalidation.
         $this->cache->flush();
+    }
+
+    // ── Namespace helpers ──────────────────────────────────────────────────
+
+    /**
+     * Returns a tenant-specific segment for Redis key construction.
+     * Empty string when tenancy is disabled or not yet initialised.
+     */
+    private function tenantSegment(): string
+    {
+        $mode = config('keystone.tenancy.mode', 'none');
+
+        if ($mode === 'none') {
+            return '';
+        }
+
+        if (! function_exists('tenant') || tenant() === null) {
+            return '';
+        }
+
+        return (string) tenant()->getTenantKey().':';
+    }
+
+    private function keyFor(string $apiKey): string
+    {
+        return $this->prefix.':'.$this->tenantSegment().'key:'.$apiKey;
+    }
+
+    private function ownerKeyFor(string $type, int|string $id): string
+    {
+        return $this->prefix.':'.$this->tenantSegment().'owner:'.$type.':'.$id;
     }
 }

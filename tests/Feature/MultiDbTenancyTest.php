@@ -28,7 +28,7 @@ it('KeystoneBootstrapper::bootstrap flushes the resolved in-memory state', funct
     $service = app(ApiKeyService::class);
 
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'Multi A']);
+    $user = User::create(['name' => 'Multi A']);
     $result = $user->createApiKey('Key A');
 
     // Warm the in-memory state
@@ -46,11 +46,11 @@ it('KeystoneBootstrapper::bootstrap flushes the resolved in-memory state', funct
 });
 
 it('KeystoneBootstrapper::revert flushes the resolved in-memory state', function (): void {
-    $service      = app(ApiKeyService::class);
+    $service = app(ApiKeyService::class);
     $bootstrapper = new KeystoneBootstrapper($service);
 
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'Revert Test']);
+    $user = User::create(['name' => 'Revert Test']);
     $result = $user->createApiKey('Key A');
     $service->findByApiKey($result['api_key']);
 
@@ -66,14 +66,14 @@ it('KeystoneBootstrapper::revert flushes the resolved in-memory state', function
 
 it('Redis keys are namespaced by tenant ID in multi_db mode', function (): void {
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'Multi DB User']);
+    $user = User::create(['name' => 'Multi DB User']);
     $result = $user->createApiKey('Key A');
 
     $repo = app(ApiKeyCacheRepository::class);
     $repo->put($result['model']);
 
-    $cache     = app('cache')->store('array');
-    $tenantKey = 'keystone:tenant-a:key:' . $result['api_key'];
+    $cache = app('cache')->store('array');
+    $tenantKey = 'keystone:tenant-a:key:'.$result['api_key'];
 
     expect($cache->has($tenantKey))->toBeTrue();
 });
@@ -81,7 +81,7 @@ it('Redis keys are namespaced by tenant ID in multi_db mode', function (): void 
 it('does not serve a cached key from the wrong tenant namespace', function (): void {
     // Warm cache under tenant-a
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'Multi A']);
+    $user = User::create(['name' => 'Multi A']);
     $result = $user->createApiKey('Key A');
 
     $repo = app(ApiKeyCacheRepository::class);
@@ -100,13 +100,13 @@ it('middleware authenticates successfully under multi_db mode', function (): voi
     Route::middleware('api.key')->get('/multi-db-test', fn () => response()->json(['ok' => true]));
 
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'Auth User']);
+    $user = User::create(['name' => 'Auth User']);
     $result = $user->createApiKey('Key A');
 
     $sig = hash_hmac('sha256', $result['api_key'], $result['secret_key']);
 
     $this->getJson('/multi-db-test', [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => $sig,
     ])->assertOk();
 
@@ -117,7 +117,7 @@ it('flushResolved is called and in-memory state is empty after tenant switch', f
     $service = app(ApiKeyService::class);
 
     FakeTenant::set('tenant-a');
-    $user   = User::create(['name' => 'State Test']);
+    $user = User::create(['name' => 'State Test']);
     $result = $user->createApiKey('Key A');
     $service->findByApiKey($result['api_key']); // populate resolved map
     FakeTenant::clear();

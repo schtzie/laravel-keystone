@@ -29,7 +29,7 @@ final class TenantScope implements Scope
             return;
         }
 
-        $column = $model->getTable() . '.' . config('keystone.tenancy.tenant_id_column', 'tenant_id');
+        $column = $model->getTable().'.'.config('keystone.tenancy.tenant_id_column', 'tenant_id');
 
         $builder->where($column, tenant()->getTenantKey());
     }

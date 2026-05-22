@@ -14,7 +14,7 @@ use Schatzie\Keystone\Services\ApiKeyService;
  * @method static void invalidate(string $apiKey)
  * @method static void flushResolved()
  *
- * @see \Schatzie\Keystone\Services\ApiKeyService
+ * @see ApiKeyService
  */
 final class Keystone extends Facade
 {

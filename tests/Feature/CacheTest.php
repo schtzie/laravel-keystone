@@ -16,7 +16,7 @@ function cacheRepo(): ApiKeyCacheRepository
 
 function makeUserWithKey(array $scopes = []): array
 {
-    $user   = User::create(['name' => 'Cache Test User']);
+    $user = User::create(['name' => 'Cache Test User']);
     $result = $user->createApiKey('Cache Test', $scopes);
 
     return [$user, $result];
@@ -25,7 +25,7 @@ function makeUserWithKey(array $scopes = []): array
 function signedHeaders(array $result): array
 {
     return [
-        'X-API-Key'       => $result['api_key'],
+        'X-API-Key' => $result['api_key'],
         'X-API-Signature' => hash_hmac('sha256', $result['api_key'], $result['secret_key']),
     ];
 }
@@ -56,7 +56,7 @@ it('serves the key from Redis on subsequent requests without hitting the DB', fu
 
     // Manually track DB queries on the second request
     $queries = 0;
-    \Illuminate\Support\Facades\DB::listen(static function () use (&$queries): void {
+    Illuminate\Support\Facades\DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -81,7 +81,7 @@ it('evicts the cache entry when a key is revoked', function (): void {
 });
 
 it('evicts all owner cache entries when revokeAllApiKeys is called', function (): void {
-    $user    = User::create(['name' => 'Bulk Revoke User']);
+    $user = User::create(['name' => 'Bulk Revoke User']);
     $result1 = $user->createApiKey('Key 1');
     $result2 = $user->createApiKey('Key 2');
 
@@ -120,7 +120,7 @@ it('always hits the database when cache is disabled', function (): void {
     Route::middleware('api.key')->get('/cache-disabled', fn () => response()->json(['ok' => true]));
 
     $queries = 0;
-    \Illuminate\Support\Facades\DB::listen(static function () use (&$queries): void {
+    Illuminate\Support\Facades\DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -141,6 +141,6 @@ it('stores the cache entry under the expected Redis key format', function (): vo
 
     cacheRepo()->put($result['model']);
 
-    $expectedKey = 'keystone:key:' . $result['api_key'];
+    $expectedKey = 'keystone:key:'.$result['api_key'];
     expect(Cache::store('array')->has($expectedKey))->toBeTrue();
 });

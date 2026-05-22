@@ -52,24 +52,24 @@ trait HasApiKeys
         array $scopes = [],
         ?CarbonImmutable $expiresAt = null,
     ): array {
-        $plain  = config('keystone.prefix', 'ks_')
-                . bin2hex(random_bytes((int) config('keystone.key_length', 40)));
+        $plain = config('keystone.prefix', 'ks_')
+                .bin2hex(random_bytes((int) config('keystone.key_length', 40)));
 
         $secret = bin2hex(random_bytes((int) config('keystone.key_length', 40)));
 
         /** @var ApiKey $model */
         $model = $this->apiKeys()->create([
-            'name'       => $name,
-            'api_key'    => $plain,
+            'name' => $name,
+            'api_key' => $plain,
             'secret_key' => $secret,
-            'scopes'     => $scopes ?: config('keystone.default_scopes', []),
+            'scopes' => $scopes ?: config('keystone.default_scopes', []),
             'expires_at' => $expiresAt,
         ]);
 
         return [
-            'api_key'    => $plain,
+            'api_key' => $plain,
             'secret_key' => $secret,
-            'model'      => $model,
+            'model' => $model,
         ];
     }
 

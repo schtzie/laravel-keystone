@@ -105,7 +105,7 @@ final class ApiKeyService
     {
         return $owner->createApiKey(
             $name,
-            $options['scopes']     ?? [],
+            $options['scopes'] ?? [],
             $options['expires_at'] ?? null,
         );
     }
