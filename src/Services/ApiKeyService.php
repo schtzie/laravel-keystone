@@ -103,6 +103,7 @@ final class ApiKeyService
      */
     public function generate(Model $owner, string $name, array $options = []): array
     {
+        /** @phpstan-ignore method.notFound */
         return $owner->createApiKey(
             $name,
             $options['scopes'] ?? [],

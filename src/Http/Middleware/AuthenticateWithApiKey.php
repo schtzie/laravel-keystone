@@ -41,7 +41,7 @@ final class AuthenticateWithApiKey
     ) {}
 
     /**
-     * @param  string[]  $scopes  Optional required scopes passed as middleware parameters
+     * @param  string  ...$scopes  Optional required scopes passed as middleware parameters
      */
     public function handle(Request $request, Closure $next, string ...$scopes): Response
     {
@@ -64,14 +64,21 @@ final class AuthenticateWithApiKey
 
         // Bind the keystoneable owner
         $owner = $apiKey->keystoneable;
-        app()->instance(get_class($owner), $owner);
+
+        if (! $owner instanceof \Illuminate\Database\Eloquent\Model) {
+            return response()->json(['message' => 'Unauthorized.'], 401);
+        }
+
+        app()->instance($owner::class, $owner);
         $request->attributes->set('keystoneable', $owner);
 
         // Optional auth guard login
         $guard = config('keystone.guard');
 
         if (is_string($guard) && $guard !== '') {
-            Auth::guard($guard)->setUser($owner);
+            if ($owner instanceof \Illuminate\Contracts\Auth\Authenticatable) {
+                Auth::guard($guard)->setUser($owner);
+            }
         }
 
         // Stash the resolved key for use in terminate()

@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Scope;
  *  - tenancy.mode is not 'single_db'
  *  - the tenant() helper is unavailable (tenancy not installed)
  *  - tenancy has not yet been initialized for the current request
+ *
+ * @implements Scope<Model>
  */
 final class TenantScope implements Scope
 {

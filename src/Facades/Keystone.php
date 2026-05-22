@@ -10,7 +10,7 @@ use Schatzie\Keystone\Services\ApiKeyService;
 /**
  * @method static \Schatzie\Keystone\Models\ApiKey|null resolve(\Illuminate\Http\Request $request)
  * @method static \Schatzie\Keystone\Models\ApiKey|null findByApiKey(string $rawKey)
- * @method static array{api_key: string, secret_key: string, model: \Schatzie\Keystone\Models\ApiKey} generate(\Illuminate\Database\Eloquent\Model $owner, string $name, array $options = [])
+ * @method static array{api_key: string, secret_key: string, model: \Schatzie\Keystone\Models\ApiKey} generate(\Illuminate\Database\Eloquent\Model $owner, string $name, array<string, mixed> $options = [])
  * @method static void invalidate(string $apiKey)
  * @method static void flushResolved()
  *

@@ -77,7 +77,9 @@ final class KeystoneServiceProvider extends ServiceProvider
 
     private function registerMiddleware(): void
     {
-        $this->app['router']->aliasMiddleware('api.key', AuthenticateWithApiKey::class);
+        /** @var \Illuminate\Routing\Router $router */
+        $router = $this->app->make('router');
+        $router->aliasMiddleware('api.key', AuthenticateWithApiKey::class);
     }
 
     private function registerCommands(): void

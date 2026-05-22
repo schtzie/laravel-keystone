@@ -19,7 +19,7 @@ use Schatzie\Keystone\Tenancy\Concerns\TenantAware;
  * @property string $name
  * @property string $api_key
  * @property string $secret_key
- * @property array|null $scopes
+ * @property array<string>|null $scopes
  * @property CarbonImmutable|null $expires_at
  * @property CarbonImmutable|null $last_used_at
  * @property string|null $last_used_ip
@@ -51,6 +51,8 @@ class ApiKey extends Model
 
     /**
      * Polymorphic owner — any model using the HasApiKeys trait.
+     *
+     * @return MorphTo<Model, self>
      */
     public function keystoneable(): MorphTo
     {
@@ -61,14 +63,22 @@ class ApiKey extends Model
 
     /**
      * Keys that are neither revoked nor expired.
+     *
+     * @param Builder<self> $query
+     * @return Builder<self>
      */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->notRevoked()->notExpired();
+        return $query->whereNull('revoked_at')->where(static function (Builder $q): void {
+            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+        });
     }
 
     /**
      * Keys that have not been revoked.
+     *
+     * @param Builder<self> $query
+     * @return Builder<self>
      */
     public function scopeNotRevoked(Builder $query): Builder
     {
@@ -77,6 +87,9 @@ class ApiKey extends Model
 
     /**
      * Keys that have not passed their expiry date (or have no expiry).
+     *
+     * @param Builder<self> $query
+     * @return Builder<self>
      */
     public function scopeNotExpired(Builder $query): Builder
     {
