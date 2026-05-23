@@ -12,15 +12,15 @@ Initial release of Laravel Keystone.
 
 ### Added
 
-#### Core — API Key Management
+#### Core — Client Management
 
-- **`HasApiKeys` trait** — add to any Eloquent model to give it full API key management:
-  - `createApiKey(string $name, array $scopes = [], ?CarbonImmutable $expiresAt = null): array` — generates a cryptographically random `api_key` + `secret_key` pair, persists it, and returns both plain values
-  - `revokeApiKey(int|string|ApiKey $key): bool` — soft-revokes a specific key by setting `revoked_at`
-  - `revokeAllApiKeys(): int` — revokes every active key owned by the model and evicts all their Redis entries
-  - `rotateApiKey(int|string|ApiKey $old): array` — atomically revokes the old key and creates a new one in a single DB transaction
+- **`HasKeystones` trait** — add to any Eloquent model to give it full Client management:
+  - `createKeystone(string $name, array $scopes = [], ?CarbonImmutable $expiresAt = null): array` — generates a cryptographically random `client` + `secret` pair, persists it, and returns both plain values
+  - `revokeKeystone(int|string|Keystone $key): bool` — soft-revokes a specific key by setting `revoked_at`
+  - `revokeAllKeystones(): int` — revokes every active key owned by the model and evicts all their Redis entries
+  - `rotateKeystone(int|string|Keystone $old): array` — atomically revokes the old key and creates a new one in a single DB transaction
 
-- **`ApiKey` Eloquent model** — polymorphic `keystoneable` morph-to relation, with:
+- **`Keystone` Eloquent model** — polymorphic `keystoneable` morph-to relation, with:
   - `keystoneable()` — MorphTo relationship to the owning model
   - `scopeActive()`, `scopeNotRevoked()`, `scopeNotExpired()` — composable query scopes
   - `isValid(): bool` — checks revocation status and expiry
@@ -28,9 +28,9 @@ Initial release of Laravel Keystone.
   - `markUsed(Request $request): void` — records `last_used_at` + `last_used_ip` (called from middleware `terminate()`, never adds request latency)
   - `verifySignature(string $signature): bool` — constant-time HMAC-SHA256 comparison via `hash_equals()`
 
-- **Database schema (`api_keys` table)**:
+- **Database schema (`keystoneables` table)**:
   - Polymorphic columns: `keystoneable_type`, `keystoneable_id`
-  - Authentication: `api_key` (plain, unique), `secret_key` (plain)
+  - Authentication: `client` (plain, unique), `secret` (plain)
   - Authorization: `scopes` (JSON array)
   - Lifecycle: `expires_at`, `revoked_at`, `last_used_at`, `last_used_ip`
   - Standard timestamps: `created_at`, `updated_at`
@@ -39,15 +39,15 @@ Initial release of Laravel Keystone.
 
 - Every authenticated request must supply a signature computed as:
   ```
-  hash_hmac('sha256', api_key, secret_key)
+  hash_hmac('sha256', client, secret)
   ```
 - The middleware verifies the signature server-side using `hash_equals()` to prevent timing attacks
-- Possessing the API key alone is never sufficient to authenticate — the secret is required
+- Possessing the Client alone is never sufficient to authenticate — the secret is required
 
-#### Middleware — `AuthenticateWithApiKey`
+#### Middleware — `AuthenticateWithKeystone`
 
 - Registered automatically under the `api.key` alias
-- Reads the API key from a configurable **header** (`X-API-Key`) or **query parameter** (`api_key`)
+- Reads the Client from a configurable **header** (`X-Client-Id`) or **query parameter** (`client`)
 - Reads the HMAC signature from a configurable **header** (`X-API-Signature`)
 - Enforces **optional scope** parameters: `Route::middleware('api.key:read,write')`
 - Binds the resolved owner to the IoC container and `$request->attributes->get('keystoneable')`
@@ -56,21 +56,21 @@ Initial release of Laravel Keystone.
 
 #### Caching — Redis-First Architecture
 
-- **`ApiKeyCacheRepository`** — all Redis I/O in one place:
-  - `get(string $apiKey): ?ApiKey` — deserialise cached entry
-  - `put(ApiKey $apiKey): void` — serialise and write with configurable TTL; maintains per-owner index for bulk invalidation
-  - `forget(string $apiKey): void` — evict a single entry
-  - `forgetOwner(string $type, int|string $id): void` — bulk-evict all entries belonging to an owner (used by `revokeAllApiKeys()`)
+- **`KeystoneKeyCacheRepository`** — all Redis I/O in one place:
+  - `get(string $client): ?Keystone` — deserialise cached entry
+  - `put(Keystone $client): void` — serialise and write with configurable TTL; maintains per-owner index for bulk invalidation
+  - `forget(string $client): void` — evict a single entry
+  - `forgetOwner(string $type, int|string $id): void` — bulk-evict all entries belonging to an owner (used by `revokeAllKeystones()`)
 
 - **Resolution pipeline per request** (in-memory → Redis → DB → HMAC):
   1. Check the request-scoped in-memory `$resolved` map
-  2. Check Redis (`ApiKeyCacheRepository::get`)
+  2. Check Redis (`KeystoneKeyCacheRepository::get`)
   3. Fall back to database; write-through to Redis if `warm_on_miss = true`
   4. Verify HMAC signature
 
 - **Automatic cache invalidation** via Eloquent model event observers registered in `KeystoneServiceProvider`:
-  - `ApiKey::updated` → `ApiKeyCacheRepository::forget()`
-  - `ApiKey::deleted` → `ApiKeyCacheRepository::forget()`
+  - `Keystone::updated` → `KeystoneKeyCacheRepository::forget()`
+  - `Keystone::deleted` → `KeystoneKeyCacheRepository::forget()`
 
 - **Configurable cache behaviour**:
   - `cache.enabled` — master switch; set to `false` to always hit the DB
@@ -83,38 +83,38 @@ Initial release of Laravel Keystone.
 
 Three operating modes controlled by `KEYSTONE_TENANCY_MODE`:
 
-- **`none` (default)** — standard single-tenant; flat Redis keys (`keystone:key:{api_key}`)
+- **`none` (default)** — standard single-tenant; flat Redis keys (`keystone:key:{client}`)
 
 - **`single_db`** — shared database with `tenant_id` isolation:
-  - **`TenantScope`** global scope — automatically appends `WHERE tenant_id = ?` to every `ApiKey` query based on the active `tenant()` context
+  - **`TenantScope`** global scope — automatically appends `WHERE tenant_id = ?` to every `Keystone` query based on the active `tenant()` context
   - **`TenantAware` trait** — boots `TenantScope` and auto-stamps `tenant_id` on every `creating` event; no manual column assignment needed
-  - Dedicated migration stub with `tenant_id` column + composite index on `(tenant_id, api_key)`, published via `--tag=keystone-migrations-single-db`
-  - Redis keys namespaced as `keystone:{tenant_id}:key:{api_key}`
+  - Dedicated migration stub with `tenant_id` column + composite index on `(tenant_id, client)`, published via `--tag=keystone-migrations-single-db`
+  - Redis keys namespaced as `keystone:{tenant_id}:key:{client}`
 
 - **`multi_db`** — per-tenant database:
   - stancl/tenancy switches the Eloquent connection before routes run; Keystone queries use the active connection transparently — no `tenant_id` column needed
   - Base migration stub (no `tenant_id`) published via `--tag=keystone-migrations`
-  - Redis keys namespaced as `keystone:{tenant_id}:key:{api_key}` (stancl's `RedisTenancyBootstrapper` sets the connection prefix; Keystone adds a sub-namespace on top)
+  - Redis keys namespaced as `keystone:{tenant_id}:key:{client}` (stancl's `RedisTenancyBootstrapper` sets the connection prefix; Keystone adds a sub-namespace on top)
 
 - **`KeystoneBootstrapper`** — implements `Stancl\Tenancy\Contracts\TenancyBootstrapper`:
-  - Calls `ApiKeyService::flushResolved()` on both `bootstrap()` and `revert()`
+  - Calls `KeystoneService::flushResolved()` on both `bootstrap()` and `revert()`
   - Prevents in-memory key state from leaking between tenants in long-lived PHP processes (Octane, queue workers)
   - Auto-registered when `stancl/tenancy` is installed and `tenancy.auto_register_bootstrapper = true`
 
 #### Service Layer
 
-- **`ApiKeyService`** (singleton):
-  - `resolve(Request $request): ?ApiKey` — full resolution + HMAC verification pipeline
-  - `findByApiKey(string $rawKey): ?ApiKey` — cache-aware lookup (no HMAC check)
+- **`KeystoneService`** (singleton):
+  - `resolve(Request $request): ?Keystone` — full resolution + HMAC verification pipeline
+  - `findByKeystone(string $rawKey): ?Keystone` — cache-aware lookup (no HMAC check)
   - `generate(Model $owner, string $name, array $options): array` — convenience wrapper
-  - `invalidate(string $apiKey): void` — evicts from in-memory map + Redis
+  - `invalidate(string $client): void` — evicts from in-memory map + Redis
   - `flushResolved(): void` — clears the in-memory map (called by `KeystoneBootstrapper` on tenant switch)
 
-- **`Keystone` facade** — static proxy to `ApiKeyService` with full IDE `@method` docblock
+- **`Keystone` facade** — static proxy to `KeystoneService` with full IDE `@method` docblock
 
 #### Artisan Commands
 
-- **`keystone:prune`** — deletes revoked `ApiKey` records older than `prune_revoked_after_days` (default: 30) and evicts their Redis entries before deletion
+- **`keystone:prune`** — deletes revoked `Keystone` records older than `prune_revoked_after_days` (default: 30) and evicts their Redis entries before deletion
   - `--days=N` option to override the retention period
   - Processes records in chunks of 200 to avoid memory pressure
 
@@ -139,7 +139,7 @@ Three operating modes controlled by `KEYSTONE_TENANCY_MODE`:
 #### Tests
 
 - Full PestPHP test suite covering:
-  - **`ApiKeyTest`** — key generation, plain value storage, HMAC verification, middleware happy/rejection paths, scope enforcement, owner binding, and key lifecycle (revoke / rotate)
+  - **`KeystoneTest`** — key generation, plain value storage, HMAC verification, middleware happy/rejection paths, scope enforcement, owner binding, and key lifecycle (revoke / rotate)
   - **`CacheTest`** — write-through on cache miss, Redis hit bypasses DB, automatic eviction on revoke / revokeAll / rotate, cache-disabled mode, Redis key naming format
   - **`SingleDbTenancyTest`** — `tenant_id` auto-stamping, cross-tenant isolation via `TenantScope`, tenant-namespaced Redis keys, middleware rejecting cross-tenant keys, bulk revocation scoped to current tenant
   - **`MultiDbTenancyTest`** — `KeystoneBootstrapper` flush on `bootstrap()` / `revert()`, tenant-namespaced Redis keys, cross-tenant cache miss, middleware auth under `multi_db` mode
@@ -152,7 +152,7 @@ Three operating modes controlled by `KEYSTONE_TENANCY_MODE`:
 
 Features under consideration for future releases:
 
-- [ ] IP allowlist / blocklist per API key
+- [ ] IP allowlist / blocklist per Client
 - [ ] Per-key rate limiting
 - [ ] Webhook signing support (outbound HMAC signing)
 - [ ] Key usage analytics endpoint

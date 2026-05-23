@@ -7,7 +7,7 @@ namespace Schatzie\Keystone\Tenancy\Concerns;
 use Schatzie\Keystone\Tenancy\Scopes\TenantScope;
 
 /**
- * Mixed into ApiKey to:
+ * Mixed into Keystone to:
  *  1. Register TenantScope as a global scope (filters all queries by tenant).
  *  2. Stamp the tenant_id column on every new record (single_db mode only).
  *
@@ -30,7 +30,7 @@ trait TenantAware
                 return;
             }
 
-            $col = config('keystone.tenancy.tenant_id_column', 'tenant_id');
+            $col = (string) config('keystone.tenancy.tenant_id_column', 'tenant_id');
 
             // Only set if not already provided explicitly
             if (empty($model->{$col})) {

@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
-use Schatzie\Keystone\Cache\ApiKeyCacheRepository;
+use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
 use Schatzie\Keystone\Tests\Fixtures\User;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function cacheRepo(): ApiKeyCacheRepository
+function cacheRepo(): KeystoneKeyCacheRepository
 {
-    return app(ApiKeyCacheRepository::class);
+    return app(KeystoneKeyCacheRepository::class);
 }
 
 function makeUserWithKey(array $scopes = []): array
 {
     $user = User::create(['name' => 'Cache Test User']);
-    $result = $user->createApiKey('Cache Test', $scopes);
+    $result = $user->createKeystone('Cache Test', $scopes);
 
     return [$user, $result];
 }
@@ -25,8 +25,8 @@ function makeUserWithKey(array $scopes = []): array
 function signedHeaders(array $result): array
 {
     return [
-        'X-API-Key' => $result['api_key'],
-        'X-API-Signature' => hash_hmac('sha256', $result['api_key'], $result['secret_key']),
+        'X-Client-Id' => $result['client'],
+        'X-API-Signature' => hash_hmac('sha256', $result['client'], $result['secret']),
     ];
 }
 
@@ -36,14 +36,14 @@ it('populates Redis after first DB lookup (cache miss)', function (): void {
     [$user, $result] = makeUserWithKey();
 
     // Nothing in cache yet
-    expect(cacheRepo()->get($result['api_key']))->toBeNull();
+    expect(cacheRepo()->get($result['client']))->toBeNull();
 
     Route::middleware('api.key')->get('/cache-test', fn () => response()->json(['ok' => true]));
 
     $this->getJson('/cache-test', signedHeaders($result))->assertOk();
 
     // Cache should now be warm
-    expect(cacheRepo()->get($result['api_key']))->not->toBeNull();
+    expect(cacheRepo()->get($result['client']))->not->toBeNull();
 });
 
 it('serves the key from Redis on subsequent requests without hitting the DB', function (): void {
@@ -72,26 +72,26 @@ it('evicts the cache entry when a key is revoked', function (): void {
 
     // Warm the cache manually
     cacheRepo()->put($result['model']);
-    expect(cacheRepo()->get($result['api_key']))->not->toBeNull();
+    expect(cacheRepo()->get($result['client']))->not->toBeNull();
 
     $result['model']->revoke();
 
-    // ApiKey::updated event fires → cache invalidation
-    expect(cacheRepo()->get($result['api_key']))->toBeNull();
+    // Keystone::updated event fires → cache invalidation
+    expect(cacheRepo()->get($result['client']))->toBeNull();
 });
 
-it('evicts all owner cache entries when revokeAllApiKeys is called', function (): void {
+it('evicts all owner cache entries when revokeAllKeystones is called', function (): void {
     $user = User::create(['name' => 'Bulk Revoke User']);
-    $result1 = $user->createApiKey('Key 1');
-    $result2 = $user->createApiKey('Key 2');
+    $result1 = $user->createKeystone('Key 1');
+    $result2 = $user->createKeystone('Key 2');
 
     cacheRepo()->put($result1['model']);
     cacheRepo()->put($result2['model']);
 
-    $user->revokeAllApiKeys();
+    $user->revokeAllKeystones();
 
-    expect(cacheRepo()->get($result1['api_key']))->toBeNull();
-    expect(cacheRepo()->get($result2['api_key']))->toBeNull();
+    expect(cacheRepo()->get($result1['client']))->toBeNull();
+    expect(cacheRepo()->get($result2['client']))->toBeNull();
 });
 
 // ── Rotate Invalidation ────────────────────────────────────────────────────
@@ -101,13 +101,13 @@ it('evicts the old key from cache when rotated', function (): void {
 
     cacheRepo()->put($result['model']);
 
-    $rotated = $user->rotateApiKey($result['model']);
+    $rotated = $user->rotateKeystone($result['model']);
 
     // Old key should be gone from cache
-    expect(cacheRepo()->get($result['api_key']))->toBeNull();
+    expect(cacheRepo()->get($result['client']))->toBeNull();
 
     // New key is NOT pre-cached until first auth request
-    expect(cacheRepo()->get($rotated['api_key']))->toBeNull();
+    expect(cacheRepo()->get($rotated['client']))->toBeNull();
 });
 
 // ── Cache Disabled ─────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ it('always hits the database when cache is disabled', function (): void {
     expect($queries)->toBeGreaterThan(0);
 
     // Cache should remain empty
-    expect(cacheRepo()->get($result['api_key']))->toBeNull();
+    expect(cacheRepo()->get($result['client']))->toBeNull();
 })->after(function (): void {
     config(['keystone.cache.enabled' => true]);
 });
@@ -141,6 +141,6 @@ it('stores the cache entry under the expected Redis key format', function (): vo
 
     cacheRepo()->put($result['model']);
 
-    $expectedKey = 'keystone:key:'.$result['api_key'];
+    $expectedKey = 'keystone:key:'.$result['client'];
     expect(Cache::store('array')->has($expectedKey))->toBeTrue();
 });

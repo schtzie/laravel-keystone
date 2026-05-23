@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 
 /**
- * Automatically restricts ApiKey queries to the current tenant when
+ * Automatically restricts Keystone queries to the current tenant when
  * KEYSTONE_TENANCY_MODE=single_db. Applied as a global scope via TenantAware.
  *
  * Has no effect when:
@@ -31,7 +31,7 @@ final class TenantScope implements Scope
             return;
         }
 
-        $column = $model->getTable().'.'.config('keystone.tenancy.tenant_id_column', 'tenant_id');
+        $column = $model->getTable().'.'.(string) config('keystone.tenancy.tenant_id_column', 'tenant_id');
 
         $builder->where($column, tenant()->getTenantKey());
     }

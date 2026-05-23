@@ -1,6 +1,6 @@
 # Laravel Keystone
 
-> API key management for Laravel — attach API keys to any Eloquent model, authenticate requests via HMAC SHA-256, cache keys in Redis for zero-database-per-request throughput, and run natively in single-database or multi-database multi-tenant architectures.
+> Client management for Laravel — attach Clients to any Eloquent model, authenticate requests via HMAC SHA-256, cache keys in Redis for zero-database-per-request throughput, and run natively in single-database or multi-database multi-tenant architectures.
 
 [![Laravel](https://img.shields.io/badge/Laravel-11%20%7C%2012%20%7C%2013-red.svg)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-blue.svg)](https://php.net)
@@ -16,8 +16,8 @@
 - [Configuration](#configuration)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
-  - [HasApiKeys Trait](#hasapikeys-trait)
-  - [Creating API Keys](#creating-api-keys)
+  - [HasKeystones Trait](#hasapikeys-trait)
+  - [Creating Clients](#creating-api-keys)
   - [HMAC SHA-256 Authentication](#hmac-sha-256-authentication)
   - [Middleware](#middleware)
   - [Scope Enforcement](#scope-enforcement)
@@ -43,9 +43,9 @@
 
 ## Overview
 
-Laravel Keystone lets any Eloquent model (User, Team, Application, etc.) own one or more API keys. Incoming HTTP requests are authenticated by:
+Laravel Keystone lets any Eloquent model (User, Team, Application, etc.) own one or more Clients. Incoming HTTP requests are authenticated by:
 
-1. Reading a **plain API key** from a header or query parameter
+1. Reading a **plain Client** from a header or query parameter
 2. Verifying an **HMAC-SHA256 signature** (signed with the secret key)
 3. Optionally enforcing **scopes** on the resolved key
 
@@ -101,19 +101,19 @@ After publishing, edit `config/keystone.php`:
 ```php
 return [
     // Database table name
-    'table'  => 'api_keys',
+    'table'  => 'keystoneables',
 
-    // Prefix prepended to every generated api_key value
+    // Prefix prepended to every generated client value
     'prefix' => 'ks_',
 
     // Byte length of randomly generated key / secret (hex output = length * 2)
     'key_length' => 40,
 
-    // Header the client sends the plain API key in
-    'header' => 'X-API-Key',
+    // Header the client sends the plain Client in
+    'header' => 'X-Client-Id',
 
     // Fallback query parameter (used when header is absent)
-    'query_param' => 'api_key',
+    'query_param' => 'client',
 
     // Header the client sends the HMAC-SHA256 signature in
     'signature_header' => 'X-API-Signature',
@@ -151,24 +151,24 @@ return [
 ### 1. Add the trait to your model
 
 ```php
-use Schatzie\Keystone\Traits\HasApiKeys;
+use Schatzie\Keystone\Traits\HasKeystones;
 
 class User extends Model
 {
-    use HasApiKeys;
+    use HasKeystones;
 }
 ```
 
-### 2. Generate an API key pair
+### 2. Generate an Client pair
 
 ```php
 $user = User::find(1);
 
-$result = $user->createApiKey('My Mobile App');
+$result = $user->createKeystone('My Mobile App');
 
 // Show these to the client ONCE — never store the secret in cleartext again
-echo $result['api_key'];    // ks_a1b2c3d4...  (plain key)
-echo $result['secret_key']; // f9e8d7c6...     (signing secret)
+echo $result['client'];    // ks_a1b2c3d4...  (plain key)
+echo $result['secret']; // f9e8d7c6...     (signing secret)
 ```
 
 ### 3. Protect routes
@@ -182,12 +182,12 @@ Route::middleware('api.key')->group(function () {
 ### 4. Client sends requests
 
 The client must:
-- Send the plain `api_key` in the `X-API-Key` header
-- Compute `hash_hmac('sha256', $api_key, $secret_key)` and send it in `X-API-Signature`
+- Send the plain `client` in the `X-Client-Id` header
+- Compute `hash_hmac('sha256', $client, $secret)` and send it in `X-API-Signature`
 
 ```
 GET /profile HTTP/1.1
-X-API-Key: ks_a1b2c3d4...
+X-Client-Id: ks_a1b2c3d4...
 X-API-Signature: 9f86d081...
 ```
 
@@ -195,51 +195,51 @@ X-API-Signature: 9f86d081...
 
 ## Core Concepts
 
-### HasApiKeys Trait
+### HasKeystones Trait
 
-Add this trait to any Eloquent model to give it API key management:
+Add this trait to any Eloquent model to give it Client management:
 
 ```php
-use Schatzie\Keystone\Traits\HasApiKeys;
+use Schatzie\Keystone\Traits\HasKeystones;
 
 class Team extends Model
 {
-    use HasApiKeys;
+    use HasKeystones;
 }
 
 class Application extends Model
 {
-    use HasApiKeys;
+    use HasKeystones;
 }
 ```
 
-The trait is **polymorphic** — any number of model types can own keys, and they all share the same `api_keys` table via the `keystoneable_type` / `keystoneable_id` columns.
+The trait is **polymorphic** — any number of model types can own keys, and they all share the same `keystoneables` table via the `keystoneable_type` / `keystoneable_id` columns.
 
 ---
 
-### Creating API Keys
+### Creating Clients
 
 ```php
 // Basic — no expiry, no scopes
-$result = $user->createApiKey('Production Key');
+$result = $user->createKeystone('Production Key');
 
 // With scopes
-$result = $user->createApiKey('Read-Only Key', ['read']);
+$result = $user->createKeystone('Read-Only Key', ['read']);
 
 // With expiry
-$result = $user->createApiKey(
+$result = $user->createKeystone(
     'Temporary Key',
     ['read', 'write'],
     now()->addDays(30)->toImmutable()
 );
 
 // Return value
-$result['api_key'];    // plain key  — give to client, stored in DB as-is
-$result['secret_key']; // plain secret — show once, stored in DB as-is
-$result['model'];      // the persisted ApiKey Eloquent model
+$result['client'];    // plain key  — give to client, stored in DB as-is
+$result['secret']; // plain secret — show once, stored in DB as-is
+$result['model'];      // the persisted Keystone Eloquent model
 ```
 
-> **Security note:** Both the plain API key and the plain secret are stored in the database. The authentication security comes from the HMAC-SHA256 signature requirement — possessing only the API key is never sufficient to authenticate.
+> **Security note:** Both the plain Client and the plain secret are stored in the database. The authentication security comes from the HMAC-SHA256 signature requirement — possessing only the Client is never sufficient to authenticate.
 
 ---
 
@@ -248,19 +248,19 @@ $result['model'];      // the persisted ApiKey Eloquent model
 Every authenticated request must include a **signature**:
 
 ```
-signature = hash_hmac('sha256', api_key, secret_key)
+signature = hash_hmac('sha256', client, secret)
 ```
 
 The middleware recomputes this on the server side and rejects requests where the signatures don't match. `hash_equals()` is used to prevent timing attacks.
 
 **Example client code (PHP):**
 ```php
-$apiKey    = 'ks_a1b2c3d4...';
-$secretKey = 'f9e8d7c6...';
-$signature = hash_hmac('sha256', $apiKey, $secretKey);
+$client    = 'ks_a1b2c3d4...';
+$secret = 'f9e8d7c6...';
+$signature = hash_hmac('sha256', $client, $secret);
 
 Http::withHeaders([
-    'X-API-Key'       => $apiKey,
+    'X-Client-Id'       => $client,
     'X-API-Signature' => $signature,
 ])->get('https://your-app.com/api/profile');
 ```
@@ -268,13 +268,13 @@ Http::withHeaders([
 **Example client code (JavaScript):**
 ```js
 const crypto  = require('crypto');
-const apiKey  = 'ks_a1b2c3d4...';
+const client  = 'ks_a1b2c3d4...';
 const secret  = 'f9e8d7c6...';
-const sig     = crypto.createHmac('sha256', secret).update(apiKey).digest('hex');
+const sig     = crypto.createHmac('sha256', secret).update(client).digest('hex');
 
 fetch('/api/profile', {
     headers: {
-        'X-API-Key':       apiKey,
+        'X-Client-Id':       client,
         'X-API-Signature': sig,
     },
 });
@@ -292,7 +292,7 @@ Route::middleware('api.key')->group(fn () => ...);
 
 // In bootstrap/app.php (global)
 ->withMiddleware(function (Middleware $middleware) {
-    $middleware->append(\Schatzie\Keystone\Http\Middleware\AuthenticateWithApiKey::class);
+    $middleware->append(\Schatzie\Keystone\Http\Middleware\AuthenticateWithKeystone::class);
 })
 ```
 
@@ -318,7 +318,7 @@ Route::middleware('api.key:read,write')->post('/items', ...);
 Assign scopes when creating a key:
 
 ```php
-$result = $user->createApiKey('Admin Key', ['read', 'write', 'delete']);
+$result = $user->createKeystone('Admin Key', ['read', 'write', 'delete']);
 ```
 
 Missing scope returns:
@@ -340,8 +340,8 @@ $owner = $request->attributes->get('keystoneable');
 $user = app(User::class);
 
 // 3. Via the Keystone facade
-$apiKey = Keystone::resolve($request);  // returns ApiKey model
-$owner  = $apiKey->keystoneable;         // the polymorphic owner
+$client = Keystone::resolve($request);  // returns Keystone model
+$owner  = $client->keystoneable;         // the polymorphic owner
 
 // 4. Via a route model binding helper in the controller
 public function show(Request $request): JsonResponse
@@ -360,7 +360,7 @@ public function show(Request $request): JsonResponse
 The resolution pipeline on every authenticated request:
 
 ```
-1. Read X-API-Key header / api_key query param
+1. Read X-Client-Id header / client query param
 2. Read X-API-Signature header
         │
         ▼
@@ -401,13 +401,13 @@ The `markUsed()` database write happens in `terminate()` — **after** the respo
 
 **Redis key format (no tenancy):**
 ```
-keystone:key:{api_key}
+keystone:key:{client}
 keystone:owner:{ModelClass}:{id}
 ```
 
 **Redis key format (with tenancy):**
 ```
-keystone:{tenant_id}:key:{api_key}
+keystone:{tenant_id}:key:{client}
 keystone:{tenant_id}:owner:{ModelClass}:{id}
 ```
 
@@ -416,21 +416,21 @@ keystone:{tenant_id}:owner:{ModelClass}:{id}
 ### Manual Invalidation
 
 ```php
-use Schatzie\Keystone\Cache\ApiKeyCacheRepository;
+use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
 
-$cache = app(ApiKeyCacheRepository::class);
+$cache = app(KeystoneKeyCacheRepository::class);
 
 // Evict a single key
-$cache->forget($apiKey->api_key);
+$cache->forget($client->client);
 
 // Evict all keys owned by a model
 $cache->forgetOwner(User::class, $user->id);
 ```
 
 Cache entries are **automatically evicted** on:
-- `ApiKey::updated` (e.g. revocation) → the `KeystoneServiceProvider` Eloquent observer handles this
-- `ApiKey::deleted`
-- `$owner->revokeAllApiKeys()`
+- `Keystone::updated` (e.g. revocation) → the `KeystoneServiceProvider` Eloquent observer handles this
+- `Keystone::deleted`
+- `$owner->revokeAllKeystones()`
 
 ---
 
@@ -440,16 +440,16 @@ Cache entries are **automatically evicted** on:
 
 ```php
 // Revoke a specific key by model instance
-$user->revokeApiKey($apiKey);
+$user->revokeKeystone($client);
 
 // Revoke by primary key ID
-$user->revokeApiKey(42);
+$user->revokeKeystone(42);
 
 // Revoke all keys for this owner
-$user->revokeAllApiKeys();
+$user->revokeAllKeystones();
 ```
 
-Revocation is a **soft operation** — it sets `revoked_at` to the current timestamp. The key remains in the database until pruned. Revoked keys are immediately evicted from Redis via the `ApiKey::updated` observer.
+Revocation is a **soft operation** — it sets `revoked_at` to the current timestamp. The key remains in the database until pruned. Revoked keys are immediately evicted from Redis via the `Keystone::updated` observer.
 
 ---
 
@@ -458,14 +458,14 @@ Revocation is a **soft operation** — it sets `revoked_at` to the current times
 Creates a new key pair and revokes the old one atomically in a database transaction:
 
 ```php
-$old = $user->apiKeys()->first();
+$old = $user->keystones()->first();
 
-$new = $user->rotateApiKey($old);
+$new = $user->rotateKeystone($old);
 
 // Old key is revoked, evicted from Redis
-// New key is returned with fresh api_key + secret_key
-echo $new['api_key'];
-echo $new['secret_key'];
+// New key is returned with fresh client + secret
+echo $new['client'];
+echo $new['secret'];
 ```
 
 ---
@@ -513,7 +513,7 @@ Route::middleware('api.key')->group(fn () => ...);
 
 ### Mode: `single_db`
 
-All tenants share one database. A `tenant_id` column on `api_keys` isolates records. A global scope (`TenantScope`) automatically appends `WHERE tenant_id = ?` to every query based on the active tenant context.
+All tenants share one database. A `tenant_id` column on `keystoneables` isolates records. A global scope (`TenantScope`) automatically appends `WHERE tenant_id = ?` to every query based on the active tenant context.
 
 ```env
 KEYSTONE_TENANCY_MODE=single_db
@@ -541,16 +541,16 @@ Route::middleware([
 ```php
 // Tenant context is already initialized by stancl
 $team = Team::find(1);
-$result = $team->createApiKey('Team Key');
+$result = $team->createKeystone('Team Key');
 
-// The stored api_key row will have tenant_id = tenant()->getTenantKey()
+// The stored client row will have tenant_id = tenant()->getTenantKey()
 ```
 
 **How isolation works:**
 
 | Layer | Mechanism |
 |---|---|
-| Database | `TenantScope` global scope → `WHERE tenant_id = ?` on all ApiKey queries |
+| Database | `TenantScope` global scope → `WHERE tenant_id = ?` on all Keystone queries |
 | Redis | Cache keys are namespaced as `keystone:{tenant_id}:key:...` |
 | In-memory | `KeystoneBootstrapper::bootstrap()` clears the in-memory resolved map on tenant switch |
 
@@ -611,7 +611,7 @@ Route::middleware([
 ],
 ```
 
-It calls `ApiKeyService::flushResolved()` on both `bootstrap()` and `revert()`, ensuring in-memory key state never leaks between tenants in long-lived PHP processes (Octane, queue workers, etc.).
+It calls `KeystoneService::flushResolved()` on both `bootstrap()` and `revert()`, ensuring in-memory key state never leaks between tenants in long-lived PHP processes (Octane, queue workers, etc.).
 
 ---
 
@@ -620,13 +620,13 @@ It calls `ApiKeyService::flushResolved()` on both `bootstrap()` and `revert()`, 
 ```php
 use Schatzie\Keystone\Facades\Keystone;
 
-// Resolve an ApiKey from a request (full pipeline: Redis → DB → HMAC verify)
-$apiKey = Keystone::resolve($request);   // ApiKey|null
+// Resolve an Keystone from a request (full pipeline: Redis → DB → HMAC verify)
+$client = Keystone::resolve($request);   // Keystone|null
 
 // Look up a key by its plain value (no HMAC check)
-$apiKey = Keystone::findByApiKey('ks_abc...'); // ApiKey|null
+$client = Keystone::findByKeystone('ks_abc...'); // Keystone|null
 
-// Generate a key for a model (delegates to $owner->createApiKey())
+// Generate a key for a model (delegates to $owner->createKeystone())
 $result = Keystone::generate($user, 'My Key', [
     'scopes'     => ['read'],
     'expires_at' => now()->addYear()->toImmutable(),
@@ -656,8 +656,8 @@ Keystone hooks into Eloquent model events to keep Redis in sync automatically:
 
 | Event | Action |
 |---|---|
-| `ApiKey::updated` | Evicts the key from Redis (fires on `revoke()`) |
-| `ApiKey::deleted` | Evicts the key from Redis (fires on hard-delete / pruning) |
+| `Keystone::updated` | Evicts the key from Redis (fires on `revoke()`) |
+| `Keystone::deleted` | Evicts the key from Redis (fires on hard-delete / pruning) |
 
 These are registered in `KeystoneServiceProvider::boot()` without requiring you to publish or configure anything.
 
@@ -668,10 +668,10 @@ These are registered in `KeystoneServiceProvider::boot()` without requiring you 
 ### Asserting a key was created
 
 ```php
-$result = $user->createApiKey('Test Key');
+$result = $user->createKeystone('Test Key');
 
-$this->assertDatabaseHas('api_keys', [
-    'api_key' => $result['api_key'],
+$this->assertDatabaseHas('keystoneables', [
+    'client' => $result['client'],
     'name'    => 'Test Key',
 ]);
 ```
@@ -679,12 +679,12 @@ $this->assertDatabaseHas('api_keys', [
 ### Asserting authenticated requests
 
 ```php
-$result = $user->createApiKey('Test Key');
+$result = $user->createKeystone('Test Key');
 
-$sig = hash_hmac('sha256', $result['api_key'], $result['secret_key']);
+$sig = hash_hmac('sha256', $result['client'], $result['secret']);
 
 $this->getJson('/api/protected', [
-    'X-API-Key'       => $result['api_key'],
+    'X-Client-Id'       => $result['client'],
     'X-API-Signature' => $sig,
 ])->assertOk();
 ```
@@ -692,13 +692,13 @@ $this->getJson('/api/protected', [
 ### Testing with scopes
 
 ```php
-$result = $user->createApiKey('Read-Only', ['read']);
+$result = $user->createKeystone('Read-Only', ['read']);
 
-$sig = hash_hmac('sha256', $result['api_key'], $result['secret_key']);
+$sig = hash_hmac('sha256', $result['client'], $result['secret']);
 
 // Route requires 'write' — should fail
 $this->getJson('/api/write-resource', [
-    'X-API-Key'       => $result['api_key'],
+    'X-Client-Id'       => $result['client'],
     'X-API-Signature' => $sig,
 ])->assertUnauthorized();
 ```

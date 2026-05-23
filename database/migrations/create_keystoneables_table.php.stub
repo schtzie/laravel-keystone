@@ -14,21 +14,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('keystone.table', 'api_keys'), function (Blueprint $table): void {
+        Schema::create(config('keystone.table', 'keystoneables'), function (Blueprint $table): void {
             $table->id();
 
-            // Polymorphic owner — any Eloquent model that uses HasApiKeys
+            // Polymorphic owner — any Eloquent model that uses HasKeystones
             $table->string('keystoneable_type');
             $table->unsignedBigInteger('keystoneable_id');
 
             // Human-readable label
             $table->string('name');
 
-            // Plain API key — used to identify the record on incoming requests
-            $table->string('api_key', 80)->unique();
+            // Plain Client — used to identify the record on incoming requests
+            $table->string('client', 80)->unique();
 
             // Plain secret key — used as the HMAC-SHA256 signing secret
-            $table->string('secret_key', 80);
+            $table->string('secret', 80);
 
             // Optional JSON array of allowed scopes, e.g. ["read","write"]
             $table->json('scopes')->nullable();
@@ -45,12 +45,12 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['keystoneable_type', 'keystoneable_id'], 'api_keys_keystoneable_index');
+            $table->index(['keystoneable_type', 'keystoneable_id'], 'keystoneables_keystoneable_index');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists(config('keystone.table', 'api_keys'));
+        Schema::dropIfExists(config('keystone.table', 'keystoneables'));
     }
 };

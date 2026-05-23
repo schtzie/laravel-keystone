@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Schatzie\Keystone\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
-use Schatzie\Keystone\Traits\HasApiKeys;
+use Schatzie\Keystone\Traits\HasKeystones;
 
 /**
  * Minimal Eloquent model fixture used across all test suites.
@@ -13,7 +13,7 @@ use Schatzie\Keystone\Traits\HasApiKeys;
  */
 final class User extends Model
 {
-    use HasApiKeys;
+    use HasKeystones;
 
     protected $table = 'users';
 

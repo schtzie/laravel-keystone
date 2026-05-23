@@ -17,8 +17,8 @@ use Schatzie\Keystone\Tenancy\Concerns\TenantAware;
  * @property int|string $keystoneable_id
  * @property string|null $tenant_id
  * @property string $name
- * @property string $api_key
- * @property string $secret_key
+ * @property string $client
+ * @property string $secret
  * @property array<string>|null $scopes
  * @property CarbonImmutable|null $expires_at
  * @property CarbonImmutable|null $last_used_at
@@ -27,7 +27,7 @@ use Schatzie\Keystone\Tenancy\Concerns\TenantAware;
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  */
-class ApiKey extends Model
+class Keystone extends Model
 {
     use TenantAware;
 
@@ -44,13 +44,13 @@ class ApiKey extends Model
 
     public function getTable(): string
     {
-        return config('keystone.table', 'api_keys');
+        return config('keystone.table', 'keystoneables');
     }
 
     // ── Relationships ──────────────────────────────────────────────────────
 
     /**
-     * Polymorphic owner — any model using the HasApiKeys trait.
+     * Polymorphic owner — any model using the HasKeystones trait.
      *
      * @return MorphTo<Model, $this>
      */
@@ -140,12 +140,12 @@ class ApiKey extends Model
     }
 
     /**
-     * Verify that the given signature matches hash_hmac('sha256', api_key, secret_key).
+     * Verify that the given signature matches hash_hmac('sha256', client, secret).
      * Uses hash_equals to prevent timing attacks.
      */
     public function verifySignature(string $signature): bool
     {
-        $expected = hash_hmac('sha256', $this->api_key, $this->secret_key);
+        $expected = hash_hmac('sha256', $this->client, $this->secret);
 
         return hash_equals($expected, $signature);
     }

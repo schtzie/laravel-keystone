@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Schatzie\Keystone\Cache\ApiKeyCacheRepository;
-use Schatzie\Keystone\Services\ApiKeyService;
+use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schatzie\Keystone\Services\KeystoneService;
 use Schatzie\Keystone\Tenancy\KeystoneBootstrapper;
 use Schatzie\Keystone\Tests\Fixtures\User;
 use Schatzie\Keystone\Tests\Support\FakeTenant;
@@ -25,14 +25,14 @@ afterEach(function (): void {
 // ── KeystoneBootstrapper ───────────────────────────────────────────────────
 
 it('KeystoneBootstrapper::bootstrap flushes the resolved in-memory state', function (): void {
-    $service = app(ApiKeyService::class);
+    $service = app(KeystoneService::class);
 
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'Multi A']);
-    $result = $user->createApiKey('Key A');
+    $result = $user->createKeystone('Key A');
 
     // Warm the in-memory state
-    $service->findByApiKey($result['api_key']);
+    $service->findByKeystone($result['client']);
 
     // Simulate tenant switch via bootstrapper
     $bootstrapper = new KeystoneBootstrapper($service);
@@ -46,13 +46,13 @@ it('KeystoneBootstrapper::bootstrap flushes the resolved in-memory state', funct
 });
 
 it('KeystoneBootstrapper::revert flushes the resolved in-memory state', function (): void {
-    $service = app(ApiKeyService::class);
+    $service = app(KeystoneService::class);
     $bootstrapper = new KeystoneBootstrapper($service);
 
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'Revert Test']);
-    $result = $user->createApiKey('Key A');
-    $service->findByApiKey($result['api_key']);
+    $result = $user->createKeystone('Key A');
+    $service->findByKeystone($result['client']);
 
     $bootstrapper->revert();
 
@@ -67,13 +67,13 @@ it('KeystoneBootstrapper::revert flushes the resolved in-memory state', function
 it('Redis keys are namespaced by tenant ID in multi_db mode', function (): void {
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'Multi DB User']);
-    $result = $user->createApiKey('Key A');
+    $result = $user->createKeystone('Key A');
 
-    $repo = app(ApiKeyCacheRepository::class);
+    $repo = app(KeystoneKeyCacheRepository::class);
     $repo->put($result['model']);
 
     $cache = app('cache')->store('array');
-    $tenantKey = 'keystone:tenant-a:key:'.$result['api_key'];
+    $tenantKey = 'keystone:tenant-a:key:'.$result['client'];
 
     expect($cache->has($tenantKey))->toBeTrue();
 });
@@ -82,15 +82,15 @@ it('does not serve a cached key from the wrong tenant namespace', function (): v
     // Warm cache under tenant-a
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'Multi A']);
-    $result = $user->createApiKey('Key A');
+    $result = $user->createKeystone('Key A');
 
-    $repo = app(ApiKeyCacheRepository::class);
+    $repo = app(KeystoneKeyCacheRepository::class);
     $repo->put($result['model']);
     FakeTenant::clear();
 
-    // Switch to tenant-b — should get a cache miss for the same api_key
+    // Switch to tenant-b — should get a cache miss for the same client
     FakeTenant::set('tenant-b');
-    expect($repo->get($result['api_key']))->toBeNull();
+    expect($repo->get($result['client']))->toBeNull();
     FakeTenant::clear();
 });
 
@@ -101,12 +101,12 @@ it('middleware authenticates successfully under multi_db mode', function (): voi
 
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'Auth User']);
-    $result = $user->createApiKey('Key A');
+    $result = $user->createKeystone('Key A');
 
-    $sig = hash_hmac('sha256', $result['api_key'], $result['secret_key']);
+    $sig = hash_hmac('sha256', $result['client'], $result['secret']);
 
     $this->getJson('/multi-db-test', [
-        'X-API-Key' => $result['api_key'],
+        'X-Client-Id' => $result['client'],
         'X-API-Signature' => $sig,
     ])->assertOk();
 
@@ -114,12 +114,12 @@ it('middleware authenticates successfully under multi_db mode', function (): voi
 });
 
 it('flushResolved is called and in-memory state is empty after tenant switch', function (): void {
-    $service = app(ApiKeyService::class);
+    $service = app(KeystoneService::class);
 
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'State Test']);
-    $result = $user->createApiKey('Key A');
-    $service->findByApiKey($result['api_key']); // populate resolved map
+    $result = $user->createKeystone('Key A');
+    $service->findByKeystone($result['client']); // populate resolved map
     FakeTenant::clear();
 
     // Simulate bootstrapper call (as tenancy v4 would)

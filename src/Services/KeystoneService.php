@@ -6,44 +6,44 @@ namespace Schatzie\Keystone\Services;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Schatzie\Keystone\Cache\ApiKeyCacheRepository;
-use Schatzie\Keystone\Models\ApiKey;
+use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schatzie\Keystone\Models\Keystone;
 
 /**
- * Orchestrates the Redis-first API key resolution pipeline:
+ * Orchestrates the Redis-first Client resolution pipeline:
  *   in-memory → Redis → database → HMAC verification
  *
  * Registered as a singleton so the $resolved map persists across
  * multiple service calls within the same request. The map is flushed
  * by KeystoneBootstrapper on every tenant switch (Octane safety).
  */
-final class ApiKeyService
+final class KeystoneService
 {
     /**
-     * Per-request in-memory map: plain api_key → resolved ApiKey|null.
+     * Per-request in-memory map: plain client → resolved Keystone|null.
      * Prevents redundant Redis/DB round-trips within a single request.
      *
-     * @var array<string, ApiKey|null>
+     * @var array<string, Keystone|null>
      */
     private array $resolved = [];
 
-    public function __construct(private readonly ApiKeyCacheRepository $cache) {}
+    public function __construct(private readonly KeystoneKeyCacheRepository $cache) {}
 
     // ── Resolution ─────────────────────────────────────────────────────────
 
     /**
-     * Resolve an ApiKey from the incoming request.
+     * Resolve an Keystone from the incoming request.
      *
-     * Reads the plain api_key from the configured header / query param,
+     * Reads the plain client from the configured header / query param,
      * looks it up (cache → DB), then verifies the HMAC-SHA256 signature.
      *
      * Returns null if the key is missing, invalid, revoked, expired,
      * or the signature does not match.
      */
-    public function resolve(Request $request): ?ApiKey
+    public function resolve(Request $request): ?Keystone
     {
-        $rawKey = $request->header(config('keystone.header', 'X-API-Key'))
-               ?? $request->query(config('keystone.query_param', 'api_key'));
+        $rawKey = $request->header(config('keystone.header', 'X-Client-Id'))
+               ?? $request->query(config('keystone.query_param', 'client'));
 
         if (! is_string($rawKey) || $rawKey === '') {
             return null;
@@ -55,56 +55,56 @@ final class ApiKeyService
             return null;
         }
 
-        $apiKey = $this->findByApiKey($rawKey);
+        $client = $this->findByKeystone($rawKey);
 
-        if ($apiKey === null || ! $apiKey->isValid()) {
+        if ($client === null || ! $client->isValid()) {
             return null;
         }
 
-        if (! $apiKey->verifySignature($signature)) {
+        if (! $client->verifySignature($signature)) {
             return null;
         }
 
-        return $apiKey;
+        return $client;
     }
 
     /**
      * Cache-aware key lookup:
      *   1. in-memory ($resolved map)
-     *   2. Redis (ApiKeyCacheRepository)
+     *   2. Redis (KeystoneKeyCacheRepository)
      *   3. Database (with optional write-through to Redis)
      */
-    public function findByApiKey(string $rawKey): ?ApiKey
+    public function findByKeystone(string $rawKey): ?Keystone
     {
         if (array_key_exists($rawKey, $this->resolved)) {
             return $this->resolved[$rawKey];
         }
 
         // Redis lookup
-        $apiKey = $this->cache->get($rawKey);
+        $client = $this->cache->get($rawKey);
 
         // Database fallback
-        if ($apiKey === null) {
-            $apiKey = ApiKey::where('api_key', $rawKey)->first();
+        if ($client === null) {
+            $client = Keystone::where('client', $rawKey)->first();
 
-            if ($apiKey !== null && config('keystone.cache.warm_on_miss', true)) {
-                $this->cache->put($apiKey);
+            if ($client !== null && config('keystone.cache.warm_on_miss', true)) {
+                $this->cache->put($client);
             }
         }
 
-        return $this->resolved[$rawKey] = $apiKey;
+        return $this->resolved[$rawKey] = $client;
     }
 
     /**
-     * Convenience wrapper — delegates to the owner model's createApiKey().
+     * Convenience wrapper — delegates to the owner model's createKeystone().
      *
      * @param  array{scopes?: array<int,string>, expires_at?: \Carbon\CarbonImmutable|null}  $options
-     * @return array{api_key: string, secret_key: string, model: ApiKey}
+     * @return array{client: string, secret: string, model: Keystone}
      */
     public function generate(Model $owner, string $name, array $options = []): array
     {
         /** @phpstan-ignore method.notFound */
-        return $owner->createApiKey(
+        return $owner->createKeystone(
             $name,
             $options['scopes'] ?? [],
             $options['expires_at'] ?? null,
@@ -112,12 +112,12 @@ final class ApiKeyService
     }
 
     /**
-     * Force-evict an api_key from both the in-memory map and Redis.
+     * Force-evict an client from both the in-memory map and Redis.
      */
-    public function invalidate(string $apiKey): void
+    public function invalidate(string $client): void
     {
-        unset($this->resolved[$apiKey]);
-        $this->cache->forget($apiKey);
+        unset($this->resolved[$client]);
+        $this->cache->forget($client);
     }
 
     /**

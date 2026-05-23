@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Schatzie\Keystone\Cache;
 
 use Illuminate\Contracts\Cache\Repository;
-use Schatzie\Keystone\Models\ApiKey;
+use Schatzie\Keystone\Models\Keystone;
 
 /**
  * Single source of truth for all Keystone Redis interactions.
@@ -15,8 +15,8 @@ use Schatzie\Keystone\Models\ApiKey;
  * strictly separated within a shared Redis instance.
  *
  * Redis key layout:
- *   {prefix}:{tenantSegment}key:{api_key}
- *   {prefix}:{tenantSegment}owner:{type}:{id}   → JSON array of api_key strings
+ *   {prefix}:{tenantSegment}key:{client}
+ *   {prefix}:{tenantSegment}owner:{type}:{id}   → JSON array of client strings
  *
  * Examples (prefix = "keystone", tenant = "abc"):
  *   keystone:abc:key:ks_xxxx...
@@ -26,7 +26,7 @@ use Schatzie\Keystone\Models\ApiKey;
  *   keystone:key:ks_xxxx...
  *   keystone:owner:App\Models\User:42
  */
-final class ApiKeyCacheRepository
+final class KeystoneKeyCacheRepository
 {
     public function __construct(
         private readonly Repository $cache,
@@ -37,17 +37,17 @@ final class ApiKeyCacheRepository
     // ── Public API ─────────────────────────────────────────────────────────
 
     /**
-     * Retrieve a cached ApiKey by its plain api_key value.
+     * Retrieve a cached Keystone by its plain client value.
      * Returns null on a cache miss.
      */
-    public function get(string $apiKey): ?ApiKey
+    public function get(string $client): ?Keystone
     {
         if (! config('keystone.cache.enabled', true)) {
             return null;
         }
 
         /** @var string|null $data */
-        $data = $this->cache->get($this->keyFor($apiKey));
+        $data = $this->cache->get($this->keyFor($client));
 
         if ($data === null) {
             return null;
@@ -59,23 +59,23 @@ final class ApiKeyCacheRepository
             return null;
         }
 
-        return (new ApiKey())->setRawAttributes($attributes);
+        return (new Keystone())->setRawAttributes($attributes);
     }
 
     /**
-     * Write an ApiKey into the cache and track it in the owner index.
+     * Write an Keystone into the cache and track it in the owner index.
      */
-    public function put(ApiKey $apiKey): void
+    public function put(Keystone $client): void
     {
         if (! config('keystone.cache.enabled', true)) {
             return;
         }
 
-        $keyEntry = $this->keyFor($apiKey->api_key);
-        $ownerEntry = $this->ownerKeyFor($apiKey->keystoneable_type, $apiKey->keystoneable_id);
+        $keyEntry = $this->keyFor($client->client);
+        $ownerEntry = $this->ownerKeyFor($client->keystoneable_type, $client->keystoneable_id);
 
         // Serialise model attributes (no relations)
-        $payload = json_encode($apiKey->getAttributes());
+        $payload = json_encode($client->getAttributes());
 
         $this->cache->put($keyEntry, $payload, $this->ttl);
 
@@ -85,19 +85,19 @@ final class ApiKeyCacheRepository
         /** @var array<int, string> $set */
         $set = json_decode($existingJson, true);
 
-        if (! in_array($apiKey->api_key, $set, true)) {
-            $set[] = $apiKey->api_key;
+        if (! in_array($client->client, $set, true)) {
+            $set[] = $client->client;
         }
 
         $this->cache->put($ownerEntry, json_encode(array_values($set)), $this->ttl);
     }
 
     /**
-     * Evict a single api_key entry from the cache.
+     * Evict a single client entry from the cache.
      */
-    public function forget(string $apiKey): void
+    public function forget(string $client): void
     {
-        $this->cache->forget($this->keyFor($apiKey));
+        $this->cache->forget($this->keyFor($client));
     }
 
     /**
@@ -112,8 +112,8 @@ final class ApiKeyCacheRepository
         /** @var array<int, string> $keys */
         $keys = json_decode($json, true);
 
-        foreach ($keys as $apiKey) {
-            $this->cache->forget($this->keyFor($apiKey));
+        foreach ($keys as $client) {
+            $this->cache->forget($this->keyFor($client));
         }
 
         $this->cache->forget($ownerEntry);
@@ -152,9 +152,9 @@ final class ApiKeyCacheRepository
         return (string) tenant()->getTenantKey().':';
     }
 
-    private function keyFor(string $apiKey): string
+    private function keyFor(string $client): string
     {
-        return $this->prefix.':'.$this->tenantSegment().'key:'.$apiKey;
+        return $this->prefix.':'.$this->tenantSegment().'key:'.$client;
     }
 
     private function ownerKeyFor(string $type, int|string $id): string

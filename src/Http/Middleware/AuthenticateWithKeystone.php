@@ -7,13 +7,13 @@ namespace Schatzie\Keystone\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Schatzie\Keystone\Cache\ApiKeyCacheRepository;
-use Schatzie\Keystone\Models\ApiKey;
-use Schatzie\Keystone\Services\ApiKeyService;
+use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schatzie\Keystone\Models\Keystone;
+use Schatzie\Keystone\Services\KeystoneService;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Authenticates incoming requests using an API key + HMAC-SHA256 signature.
+ * Authenticates incoming requests using an Client + HMAC-SHA256 signature.
  *
  * Middleware alias: api.key
  *
@@ -22,10 +22,10 @@ use Symfony\Component\HttpFoundation\Response;
  *   Route::middleware('api.key:read,write')->...  // scope enforcement
  *
  * Resolution order:
- *   1. Read api_key  from config('keystone.header')       header
+ *   1. Read client  from config('keystone.header')       header
  *                    or config('keystone.query_param')    query param
  *   2. Read signature from config('keystone.signature_header') header
- *   3. ApiKeyService::resolve() → Redis → DB → HMAC verify → validity check
+ *   3. KeystoneService::resolve() → Redis → DB → HMAC verify → validity check
  *   4. Optional scope check
  *   5. Bind keystoneable owner into IoC + request attributes
  *   6. Optionally log in via auth guard
@@ -33,11 +33,11 @@ use Symfony\Component\HttpFoundation\Response;
  * Usage tracking (markUsed + cache re-warm) runs in terminate() after the
  * response is already sent, adding zero latency to API responses.
  */
-final class AuthenticateWithApiKey
+final class AuthenticateWithKeystone
 {
     public function __construct(
-        private readonly ApiKeyService $service,
-        private readonly ApiKeyCacheRepository $cache,
+        private readonly KeystoneService $service,
+        private readonly KeystoneKeyCacheRepository $cache,
     ) {}
 
     /**
@@ -45,15 +45,15 @@ final class AuthenticateWithApiKey
      */
     public function handle(Request $request, Closure $next, string ...$scopes): Response
     {
-        $apiKey = $this->service->resolve($request);
+        $client = $this->service->resolve($request);
 
-        if ($apiKey === null) {
+        if ($client === null) {
             return response()->json(['message' => 'Unauthorized.'], 401);
         }
 
         // Scope enforcement
         if ($scopes !== []) {
-            $keyScopes = $apiKey->scopes ?? [];
+            $keyScopes = $client->scopes ?? [];
 
             foreach ($scopes as $required) {
                 if (! in_array($required, $keyScopes, true)) {
@@ -63,7 +63,7 @@ final class AuthenticateWithApiKey
         }
 
         // Bind the keystoneable owner
-        $owner = $apiKey->keystoneable;
+        $owner = $client->keystoneable;
 
         if (! $owner instanceof \Illuminate\Database\Eloquent\Model) {
             return response()->json(['message' => 'Unauthorized.'], 401);
@@ -82,7 +82,7 @@ final class AuthenticateWithApiKey
         }
 
         // Stash the resolved key for use in terminate()
-        $request->attributes->set('_keystone_api_key', $apiKey);
+        $request->attributes->set('_keystone_client', $client);
 
         return $next($request);
     }
@@ -93,16 +93,16 @@ final class AuthenticateWithApiKey
      */
     public function terminate(Request $request, Response $response): void
     {
-        $apiKey = $request->attributes->get('_keystone_api_key');
+        $client = $request->attributes->get('_keystone_client');
 
-        if (! $apiKey instanceof ApiKey) {
+        if (! $client instanceof Keystone) {
             return;
         }
 
-        $apiKey->markUsed($request);
+        $client->markUsed($request);
 
         if (config('keystone.cache.refresh_on_use', true)) {
-            $this->cache->put($apiKey);
+            $this->cache->put($client);
         }
     }
 }

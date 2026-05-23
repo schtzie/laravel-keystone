@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Schatzie\Keystone;
 
 use Illuminate\Support\ServiceProvider;
-use Schatzie\Keystone\Cache\ApiKeyCacheRepository;
-use Schatzie\Keystone\Commands\PruneApiKeysCommand;
-use Schatzie\Keystone\Http\Middleware\AuthenticateWithApiKey;
-use Schatzie\Keystone\Models\ApiKey;
-use Schatzie\Keystone\Services\ApiKeyService;
+use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schatzie\Keystone\Commands\PruneKeystonesCommand;
+use Schatzie\Keystone\Http\Middleware\AuthenticateWithKeystone;
+use Schatzie\Keystone\Models\Keystone;
+use Schatzie\Keystone\Services\KeystoneService;
 use Schatzie\Keystone\Tenancy\KeystoneBootstrapper;
 
 final class KeystoneServiceProvider extends ServiceProvider
@@ -23,8 +23,8 @@ final class KeystoneServiceProvider extends ServiceProvider
             'keystone',
         );
 
-        $this->app->singleton(ApiKeyCacheRepository::class, function ($app): ApiKeyCacheRepository {
-            return new ApiKeyCacheRepository(
+        $this->app->singleton(KeystoneKeyCacheRepository::class, function ($app): KeystoneKeyCacheRepository {
+            return new KeystoneKeyCacheRepository(
                 cache: $app['cache']->store(config('keystone.cache.store', 'redis')),
                 prefix: config('keystone.cache.prefix', 'keystone'),
                 ttl: config('keystone.cache.ttl') !== null
@@ -33,9 +33,9 @@ final class KeystoneServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(ApiKeyService::class, function ($app): ApiKeyService {
-            return new ApiKeyService(
-                cache: $app->make(ApiKeyCacheRepository::class),
+        $this->app->singleton(KeystoneService::class, function ($app): KeystoneService {
+            return new KeystoneService(
+                cache: $app->make(KeystoneKeyCacheRepository::class),
             );
         });
     }
@@ -66,12 +66,12 @@ final class KeystoneServiceProvider extends ServiceProvider
 
         // Base migration (none / multi_db modes)
         $this->publishes([
-            __DIR__.'/../database/migrations/create_api_keys_table.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_api_keys_table.php'),
+            __DIR__.'/../database/migrations/create_keystoneables_table.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_keystoneables_table.php'),
         ], 'keystone-migrations');
 
         // Single-DB migration (single_db mode)
         $this->publishes([
-            __DIR__.'/../database/migrations/create_api_keys_table_single_db.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_api_keys_table.php'),
+            __DIR__.'/../database/migrations/create_keystoneables_table_single_db.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_keystoneables_table.php'),
         ], 'keystone-migrations-single-db');
     }
 
@@ -79,28 +79,32 @@ final class KeystoneServiceProvider extends ServiceProvider
     {
         /** @var \Illuminate\Routing\Router $router */
         $router = $this->app->make('router');
-        $router->aliasMiddleware('api.key', AuthenticateWithApiKey::class);
+        $router->aliasMiddleware('api.key', AuthenticateWithKeystone::class);
     }
 
     private function registerCommands(): void
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([PruneApiKeysCommand::class]);
+            $this->commands([PruneKeystonesCommand::class]);
         }
     }
 
     /**
-     * Automatically evict Redis cache entries when ApiKey records are
+     * Automatically evict Redis cache entries when Keystone records are
      * updated (e.g. revoked) or hard-deleted.
      */
     private function registerModelObservers(): void
     {
-        ApiKey::updated(function (ApiKey $key): void {
-            app(ApiKeyCacheRepository::class)->forget($key->api_key);
+        if (! class_exists(Keystone::class)) {
+            return;
+        }
+
+        Keystone::updated(function (Keystone $key): void {
+            app(KeystoneKeyCacheRepository::class)->forget($key->client);
         });
 
-        ApiKey::deleted(function (ApiKey $key): void {
-            app(ApiKeyCacheRepository::class)->forget($key->api_key);
+        Keystone::deleted(function (Keystone $key): void {
+            app(KeystoneKeyCacheRepository::class)->forget($key->client);
         });
     }
 

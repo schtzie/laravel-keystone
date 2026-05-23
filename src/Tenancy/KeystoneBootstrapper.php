@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Schatzie\Keystone\Tenancy;
 
-use Schatzie\Keystone\Services\ApiKeyService;
+use Schatzie\Keystone\Services\KeystoneService;
 
 /**
  * Stancl/Tenancy v4 bootstrapper for Laravel Keystone.
@@ -23,7 +23,7 @@ use Schatzie\Keystone\Services\ApiKeyService;
  */
 final class KeystoneBootstrapper
 {
-    public function __construct(private readonly ApiKeyService $service) {}
+    public function __construct(private readonly KeystoneService $service) {}
 
     /**
      * Called by stancl/tenancy when a new tenant is initialised.

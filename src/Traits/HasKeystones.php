@@ -7,47 +7,47 @@ namespace Schatzie\Keystone\Traits;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
-use Schatzie\Keystone\Cache\ApiKeyCacheRepository;
-use Schatzie\Keystone\Models\ApiKey;
+use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schatzie\Keystone\Models\Keystone;
 
 /**
- * Add this trait to any Eloquent model to give it API key management.
+ * Add this trait to any Eloquent model to give it Client management.
  *
  * Usage:
  *   class User extends Model {
- *       use HasApiKeys;
+ *       use HasKeystones;
  *   }
  *
- *   $result = $user->createApiKey('My App');
- *   // $result['api_key']    — plain key to give the client
- *   // $result['secret_key'] — plain secret for HMAC signing (show once)
- *   // $result['model']      — the persisted ApiKey model
+ *   $result = $user->createKeystone('My App');
+ *   // $result['client']    — plain key to give the client
+ *   // $result['secret'] — plain secret for HMAC signing (show once)
+ *   // $result['model']      — the persisted Keystone model
  */
-trait HasApiKeys
+trait HasKeystones
 {
     // ── Relationship ───────────────────────────────────────────────────────
 
     /**
-     * All API keys belonging to this model.
+     * All Clients belonging to this model.
      * In single_db mode the query is automatically scoped to the current tenant
-     * via ApiKey's TenantScope global scope.
+     * via Keystone's TenantScope global scope.
      *
-     * @return MorphMany<ApiKey>
+     * @return MorphMany<Keystone>
      */
-    public function apiKeys(): MorphMany
+    public function keystones(): MorphMany
     {
-        return $this->morphMany(ApiKey::class, 'keystoneable');
+        return $this->morphMany(Keystone::class, 'keystoneable');
     }
 
     // ── Key Management ─────────────────────────────────────────────────────
 
     /**
-     * Generate and persist a new API key pair for this model.
+     * Generate and persist a new Client pair for this model.
      *
      * @param  array<int, string>  $scopes
-     * @return array{api_key: string, secret_key: string, model: ApiKey}
+     * @return array{client: string, secret: string, model: Keystone}
      */
-    public function createApiKey(
+    public function createKeystone(
         string $name,
         array $scopes = [],
         ?CarbonImmutable $expiresAt = null,
@@ -57,47 +57,47 @@ trait HasApiKeys
 
         $secret = bin2hex(random_bytes((int) config('keystone.key_length', 40)));
 
-        /** @var ApiKey $model */
-        $model = $this->apiKeys()->create([
+        /** @var Keystone $model */
+        $model = $this->keystones()->create([
             'name' => $name,
-            'api_key' => $plain,
-            'secret_key' => $secret,
+            'client' => $plain,
+            'secret' => $secret,
             'scopes' => $scopes ?: config('keystone.default_scopes', []),
             'expires_at' => $expiresAt,
         ]);
 
         return [
-            'api_key' => $plain,
-            'secret_key' => $secret,
+            'client' => $plain,
+            'secret' => $secret,
             'model' => $model,
         ];
     }
 
     /**
-     * Revoke a specific API key by its ID or model instance.
+     * Revoke a specific Client by its ID or model instance.
      */
-    public function revokeApiKey(int|string|ApiKey $key): bool
+    public function revokeKeystone(int|string|Keystone $key): bool
     {
-        $model = $key instanceof ApiKey
+        $model = $key instanceof Keystone
             ? $key
-            : $this->apiKeys()->findOrFail($key);
+            : $this->keystones()->findOrFail($key);
 
         return $model->revoke(); // fires Eloquent updated event → cache invalidation
     }
 
     /**
-     * Revoke all active API keys for this model.
+     * Revoke all active Clients for this model.
      * Also purges the owner's Redis index.
      */
-    public function revokeAllApiKeys(): int
+    public function revokeAllKeystones(): int
     {
         // Evict every cached key for this owner before updating the DB
-        app(ApiKeyCacheRepository::class)->forgetOwner(
+        app(KeystoneKeyCacheRepository::class)->forgetOwner(
             static::class,
             $this->getKey(),
         );
 
-        return $this->apiKeys()
+        return $this->keystones()
             ->whereNull('revoked_at')
             ->update(['revoked_at' => now()]);
     }
@@ -105,20 +105,20 @@ trait HasApiKeys
     /**
      * Revoke an existing key and create a new one atomically.
      *
-     * @return array{api_key: string, secret_key: string, model: ApiKey}
+     * @return array{client: string, secret: string, model: Keystone}
      */
-    public function rotateApiKey(int|string|ApiKey $old): array
+    public function rotateKeystone(int|string|Keystone $old): array
     {
         return DB::transaction(function () use ($old): array {
-            $oldModel = $old instanceof ApiKey
+            $oldModel = $old instanceof Keystone
                 ? $old
-                : $this->apiKeys()->findOrFail($old);
+                : $this->keystones()->findOrFail($old);
 
             $name = $oldModel->name;
 
-            $this->revokeApiKey($oldModel);
+            $this->revokeKeystone($oldModel);
 
-            return $this->createApiKey($name);
+            return $this->createKeystone($name);
         });
     }
 }

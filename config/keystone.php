@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 return [
     // ── Database ───────────────────────────────────────────────────────────
-    'table' => 'api_keys',
+    'table' => 'keystoneables',
 
     // ── Key Generation ─────────────────────────────────────────────────────
-    // Optional prefix prepended to generated api_key values (e.g. "ks_abc123...")
+    // Optional prefix prepended to generated client values (e.g. "ks_abc123...")
     'prefix' => 'ks_',
 
-    // Byte-length of randomly generated api_key and secret_key values.
+    // Byte-length of randomly generated client and secret values.
     // Final string length will be key_length * 2 (hex-encoded) + prefix length.
     'key_length' => 40,
 
     // ── Request Resolution ─────────────────────────────────────────────────
-    // Header name the client sends the plain api_key in.
-    'header' => 'X-API-Key',
+    // Header name the client sends the plain client in.
+    'header' => 'X-Client-Id',
 
     // Fallback query parameter when the header is absent.
-    'query_param' => 'api_key',
+    'query_param' => 'client',
 
     // Header name the client sends the HMAC-SHA256 signature in.
-    // Signature = hash_hmac('sha256', $api_key, $secret_key)
+    // Signature = hash_hmac('sha256', $client, $secret)
     'signature_header' => 'X-API-Signature',
 
     // ── Auth ───────────────────────────────────────────────────────────────
