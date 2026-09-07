@@ -4,6 +4,15 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] — 2026-09-07
+
+### Added
+- **Multiple Auth Guard Support**: `config('keystone.guard')` now supports passing a single guard string (`'web'`), an array of guard names (`['web', 'api']`), or a comma-separated string (`'web,api'`). Upon authentication, Keystone logs the owner model into all specified guards simultaneously.
+- **`EdgeCaseTest` — Multi-Guard Tests**: Added Pest feature tests verifying authentication into single, multiple array, and comma-separated auth guards.
+
+### Changed
+- **Config Documentation & Readability**: Beautified `config/keystone.php` with standard Laravel section header blocks and clean option descriptions for database tables, key length/prefixes, resolution headers, auth guards, default scopes, rate limits, Redis caching, multi-tenancy, and maintenance pruning.
+
 ---
 
 ## [2.0.3] — 2026-09-07
@@ -218,9 +227,10 @@ Features under consideration for future releases:
 
 ---
 
+[2.0.4]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.4
 [2.0.3]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.3
 [2.0.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.2
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.4...HEAD
