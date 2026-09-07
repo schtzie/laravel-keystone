@@ -233,6 +233,18 @@ $result = $user->createKeystone(
     now()->addDays(30)->toImmutable()
 );
 
+// With IP allowlist / blocklist & custom rate limit
+$result = $user->createKeystone(
+    'Production Key',
+    ['read', 'write'],
+    null,
+    [
+        'ip_allowlist' => ['192.168.1.0/24', '10.0.0.5'],
+        'ip_blocklist' => ['192.168.1.100'],
+        'rate_limit'   => 120, // max 120 requests/min
+    ]
+);
+
 // Return value
 $result['client'];    // plain key  — give to client, stored in DB as-is
 $result['secret']; // plain secret — show once, stored in DB as-is
@@ -325,6 +337,34 @@ Missing scope returns:
 ```json
 { "message": "Insufficient scope." }
 ```
+
+---
+
+### IP Filtering (Allowlist & Blocklist)
+
+Restrict API key access by client IP addresses. You can pass exact IPs or CIDR subnet notation in `ip_allowlist` and `ip_blocklist`:
+
+```php
+// Create a key restricted to a specific IP or subnet range
+$result = $user->createKeystone(
+    name: 'Internal Webhook Key',
+    scopes: ['read', 'write'],
+    options: [
+        'ip_allowlist' => ['192.168.1.0/24', '203.0.113.50'],
+        'ip_blocklist' => ['192.168.1.99'],
+    ]
+);
+```
+
+- **Allowlist (`ip_allowlist`)**: Only requests originating from matching IP addresses or CIDR ranges are allowed. If the client IP is not in the allowlist, the middleware returns `403 Forbidden`:
+  ```json
+  { "message": "IP address not allowed." }
+  ```
+- **Blocklist (`ip_blocklist`)**: Requests originating from blacklisted IPs or subnets are blocked, returning `403 Forbidden`:
+  ```json
+  { "message": "IP address blocked." }
+  ```
+- **CIDR Subnet Support**: Both allowlists and blocklists support CIDR mask notation (e.g. `10.0.0.0/8`, `192.168.1.0/24`, `172.16.0.0/12`) powered by Symfony's `IpUtils`.
 
 ---
 
