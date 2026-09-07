@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Tenancy\Scopes;
+namespace Schtzie\Keystone\Tenancy\Scopes;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;

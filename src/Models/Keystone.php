@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Models;
+namespace Schtzie\Keystone\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Request;
-use Schatzie\Keystone\Tenancy\Concerns\TenantAware;
+use Schtzie\Keystone\Tenancy\Concerns\TenantAware;
 
 /**
  * @property int $id
@@ -20,6 +20,9 @@ use Schatzie\Keystone\Tenancy\Concerns\TenantAware;
  * @property string $client
  * @property string $secret
  * @property array<string>|null $scopes
+ * @property array<string>|null $ip_allowlist
+ * @property array<string>|null $ip_blocklist
+ * @property int|null $rate_limit
  * @property CarbonImmutable|null $expires_at
  * @property CarbonImmutable|null $last_used_at
  * @property string|null $last_used_ip
@@ -37,6 +40,9 @@ class Keystone extends Model
     /** @var array<string, string> */
     protected $casts = [
         'scopes' => 'array',
+        'ip_allowlist' => 'array',
+        'ip_blocklist' => 'array',
+        'rate_limit' => 'integer',
         'expires_at' => 'immutable_datetime',
         'last_used_at' => 'immutable_datetime',
         'revoked_at' => 'immutable_datetime',
@@ -44,7 +50,7 @@ class Keystone extends Model
 
     public function getTable(): string
     {
-        return config('keystone.table', 'keystoneables');
+        return (string) config('keystone.table', 'keystoneables');
     }
 
     // ── Relationships ──────────────────────────────────────────────────────

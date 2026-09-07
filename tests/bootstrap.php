@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../vendor/autoload.php';
 
-use Schatzie\Keystone\Tests\Support\FakeTenant;
+use Schtzie\Keystone\Tests\Support\FakeTenant;
 
 /**
  * Global tenant() helper stub for tests.

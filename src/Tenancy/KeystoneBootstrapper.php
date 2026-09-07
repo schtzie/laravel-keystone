@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Tenancy;
+namespace Schtzie\Keystone\Tenancy;
 
-use Schatzie\Keystone\Services\KeystoneService;
+use Schtzie\Keystone\Services\KeystoneService;
 
 /**
  * Stancl/Tenancy v4 bootstrapper for Laravel Keystone.

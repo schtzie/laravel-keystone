@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Tests\Fixtures\User;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Tests\Fixtures\User;
 
 function createPruneUser(): User
 {

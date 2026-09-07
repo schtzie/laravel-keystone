@@ -151,7 +151,7 @@ return [
 ### 1. Add the trait to your model
 
 ```php
-use Schatzie\Keystone\Traits\HasKeystones;
+use Schtzie\Keystone\Traits\HasKeystones;
 
 class User extends Model
 {
@@ -200,7 +200,7 @@ X-API-Signature: 9f86d081...
 Add this trait to any Eloquent model to give it Client management:
 
 ```php
-use Schatzie\Keystone\Traits\HasKeystones;
+use Schtzie\Keystone\Traits\HasKeystones;
 
 class Team extends Model
 {
@@ -292,7 +292,7 @@ Route::middleware('api.key')->group(fn () => ...);
 
 // In bootstrap/app.php (global)
 ->withMiddleware(function (Middleware $middleware) {
-    $middleware->append(\Schatzie\Keystone\Http\Middleware\AuthenticateWithKeystone::class);
+    $middleware->append(\Schtzie\Keystone\Http\Middleware\AuthenticateWithKeystone::class);
 })
 ```
 
@@ -416,7 +416,7 @@ keystone:{tenant_id}:owner:{ModelClass}:{id}
 ### Manual Invalidation
 
 ```php
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
 
 $cache = app(KeystoneKeyCacheRepository::class);
 
@@ -607,7 +607,7 @@ Route::middleware([
 // config/tenancy.php
 'bootstrappers' => [
     ...
-    \Schatzie\Keystone\Tenancy\KeystoneBootstrapper::class,
+    \Schtzie\Keystone\Tenancy\KeystoneBootstrapper::class,
 ],
 ```
 
@@ -618,7 +618,7 @@ It calls `KeystoneService::flushResolved()` on both `bootstrap()` and `revert()`
 ## Facade Reference
 
 ```php
-use Schatzie\Keystone\Facades\Keystone;
+use Schtzie\Keystone\Facades\Keystone;
 
 // Resolve an Keystone from a request (full pipeline: Redis → DB → HMAC verify)
 $client = Keystone::resolve($request);   // Keystone|null

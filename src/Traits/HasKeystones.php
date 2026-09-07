@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Traits;
+namespace Schtzie\Keystone\Traits;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Models\Keystone;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Models\Keystone;
 
 /**
  * Add this trait to any Eloquent model to give it Client management.
@@ -51,6 +51,7 @@ trait HasKeystones
         string $name,
         array $scopes = [],
         ?CarbonImmutable $expiresAt = null,
+        array $options = [],
     ): array {
         $plain = config('keystone.prefix', 'ks_')
                 .bin2hex(random_bytes((int) config('keystone.key_length', 40)));
@@ -58,13 +59,13 @@ trait HasKeystones
         $secret = bin2hex(random_bytes((int) config('keystone.key_length', 40)));
 
         /** @var Keystone $model */
-        $model = $this->keystones()->create([
+        $model = $this->keystones()->create(array_merge([
             'name' => $name,
             'client' => $plain,
             'secret' => $secret,
             'scopes' => $scopes ?: config('keystone.default_scopes', []),
             'expires_at' => $expiresAt,
-        ]);
+        ], $options));
 
         return [
             'client' => $plain,
@@ -118,7 +119,16 @@ trait HasKeystones
 
             $this->revokeKeystone($oldModel);
 
-            return $this->createKeystone($name);
+            return $this->createKeystone(
+                $name,
+                $oldModel->scopes ?? [],
+                $oldModel->expires_at,
+                [
+                    'ip_allowlist' => $oldModel->ip_allowlist,
+                    'ip_blocklist' => $oldModel->ip_blocklist,
+                    'rate_limit' => $oldModel->rate_limit,
+                ]
+            );
         });
     }
 }

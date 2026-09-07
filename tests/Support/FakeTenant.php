@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Tests\Support;
+namespace Schtzie\Keystone\Tests\Support;
 
 /**
  * Test double that simulates the stancl/tenancy tenant() global helper.

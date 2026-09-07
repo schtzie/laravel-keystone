@@ -2,14 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Http\Middleware;
+namespace Schtzie\Keystone\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Models\Keystone;
-use Schatzie\Keystone\Services\KeystoneService;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Models\Keystone;
+use Schtzie\Keystone\Services\KeystoneService;
+use Illuminate\Support\Facades\RateLimiter;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -51,6 +53,39 @@ final class AuthenticateWithKeystone
             return response()->json(['message' => 'Unauthorized.'], 401);
         }
 
+        $ip = $request->ip();
+        if (!is_null($ip)) {
+            $allowlist = $client->ip_allowlist ?? [];
+            if ($allowlist !== [] && ! IpUtils::checkIp($ip, $allowlist)) {
+                return response()->json(['message' => 'IP address not allowed.'], 403);
+            }
+
+            $blocklist = $client->ip_blocklist ?? [];
+            if ($blocklist !== [] && IpUtils::checkIp($ip, $blocklist)) {
+                return response()->json(['message' => 'IP address blocked.'], 403);
+            }
+        }
+
+        $limitKey = null;
+        $rateLimit = $client->rate_limit ?? config('keystone.rate_limit');
+
+        if (is_numeric($rateLimit) && (int) $rateLimit > 0) {
+            $rateLimit = (int) $rateLimit;
+            $limitKey = 'keystone:rate_limit:'.$client->id;
+
+            if (RateLimiter::tooManyAttempts($limitKey, $rateLimit)) {
+                $retryAfter = RateLimiter::availableIn($limitKey);
+                return response()->json(['message' => 'Too many requests.'], 429, [
+                    'Retry-After' => $retryAfter,
+                    'X-Keystone-RateLimit-Limit' => $rateLimit,
+                    'X-Keystone-RateLimit-Remaining' => 0,
+                    'X-Keystone-RateLimit-Reset' => time() + $retryAfter,
+                ]);
+            }
+
+            RateLimiter::hit($limitKey, 60);
+        }
+
         // Scope enforcement
         if ($scopes !== []) {
             $keyScopes = $client->scopes ?? [];
@@ -84,7 +119,14 @@ final class AuthenticateWithKeystone
         // Stash the resolved key for use in terminate()
         $request->attributes->set('_keystone_client', $client);
 
-        return $next($request);
+        $response = $next($request);
+
+        if (!is_null($limitKey) && isset($rateLimit)) {
+            $response->headers->set('X-Keystone-RateLimit-Limit', (string) $rateLimit);
+            $response->headers->set('X-Keystone-RateLimit-Remaining', (string) RateLimiter::retriesLeft($limitKey, $rateLimit));
+        }
+
+        return $response;
     }
 
     /**

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Tenancy\Concerns;
+namespace Schtzie\Keystone\Tenancy\Concerns;
 
-use Schatzie\Keystone\Tenancy\Scopes\TenantScope;
+use Schtzie\Keystone\Tenancy\Scopes\TenantScope;
 
 /**
  * Mixed into Keystone to:

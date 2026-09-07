@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Services\KeystoneService;
-use Schatzie\Keystone\Tenancy\KeystoneBootstrapper;
-use Schatzie\Keystone\Tests\Fixtures\User;
-use Schatzie\Keystone\Tests\Support\FakeTenant;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Services\KeystoneService;
+use Schtzie\Keystone\Tenancy\KeystoneBootstrapper;
+use Schtzie\Keystone\Tests\Fixtures\User;
+use Schtzie\Keystone\Tests\Support\FakeTenant;
 
 // ── Setup ──────────────────────────────────────────────────────────────────
 

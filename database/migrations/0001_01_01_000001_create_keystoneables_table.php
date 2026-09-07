@@ -18,6 +18,9 @@ return new class extends Migration
             $table->string('client', 80)->unique();
             $table->string('secret', 80);
             $table->json('scopes')->nullable();
+            $table->json('ip_allowlist')->nullable();
+            $table->json('ip_blocklist')->nullable();
+            $table->integer('rate_limit')->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('last_used_at')->nullable();
             $table->string('last_used_ip', 45)->nullable();

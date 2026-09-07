@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Schatzie\Keystone\Tests\Fixtures\User;
+use Schtzie\Keystone\Tests\Fixtures\User;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ it('createKeystone returns plain client, secret, and the model', function (): vo
     expect($result)->toHaveKeys(['client', 'secret', 'model'])
         ->and($result['client'])->toStartWith('ks_')
         ->and($result['secret'])->not->toBeEmpty()
-        ->and($result['model'])->toBeInstanceOf(Schatzie\Keystone\Models\Keystone::class);
+        ->and($result['model'])->toBeInstanceOf(Schtzie\Keystone\Models\Keystone::class);
 });
 
 it('stores the plain client in the database', function (): void {

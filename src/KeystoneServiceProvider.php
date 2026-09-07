@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone;
+namespace Schtzie\Keystone;
 
 use Illuminate\Support\ServiceProvider;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Commands\PruneKeystonesCommand;
-use Schatzie\Keystone\Http\Middleware\AuthenticateWithKeystone;
-use Schatzie\Keystone\Models\Keystone;
-use Schatzie\Keystone\Services\KeystoneService;
-use Schatzie\Keystone\Tenancy\KeystoneBootstrapper;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Commands\PruneKeystonesCommand;
+use Schtzie\Keystone\Http\Middleware\AuthenticateWithKeystone;
+use Schtzie\Keystone\Models\Keystone;
+use Schtzie\Keystone\Services\KeystoneService;
+use Schtzie\Keystone\Tenancy\KeystoneBootstrapper;
 
 final class KeystoneServiceProvider extends ServiceProvider
 {

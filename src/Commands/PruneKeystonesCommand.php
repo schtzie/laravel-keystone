@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Commands;
+namespace Schtzie\Keystone\Commands;
 
 use Illuminate\Console\Command;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Models\Keystone;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Models\Keystone;
 
 /**
  * Deletes revoked Clients that are older than the configured retention period
