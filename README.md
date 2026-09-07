@@ -2,6 +2,9 @@
 
 > Client management for Laravel — attach Clients to any Eloquent model, authenticate requests via HMAC SHA-256, cache keys in Redis for zero-database-per-request throughput, and run natively in single-database or multi-database multi-tenant architectures.
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/schtzie/laravel-keystone.svg?style=flat-square)](https://packagist.org/packages/schtzie/laravel-keystone)
+[![Total Downloads](https://img.shields.io/packagist/dt/schtzie/laravel-keystone.svg?style=flat-square)](https://packagist.org/packages/schtzie/laravel-keystone)
+[![Tests](https://img.shields.io/github/actions/workflow/status/schtzie/laravel-keystone/tests.yml?style=flat-square&label=tests)](https://github.com/schtzie/laravel-keystone/actions/workflows/tests.yml)
 [![Laravel](https://img.shields.io/badge/Laravel-11%20%7C%2012%20%7C%2013-red.svg)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-blue.svg)](https://php.net)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
