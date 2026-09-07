@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [2.0.3] — 2026-09-07
+
+### Fixed
+- **`EdgeCaseTest` — Revoke Idempotency Tests (Time-Travel Hardened)**: Replaced the single flaky `revoking the same key twice is idempotent` test with 4 deterministic time-travel-based tests using `$this->travelTo()`. The previous test passed by coincidence on SQLite (1-second datetime precision meant two calls within the same second produced identical timestamps even without the guard). The new tests advance the clock 1–5 seconds between calls, making the bug detectable on any database driver.
+
+  New test cases:
+  - `revoke() preserves the original revoked_at timestamp when called a second time (time-travel safe)`
+  - `revoke() called five times never updates revoked_at after the first call`
+  - `revoke() returns true on both the first and subsequent idempotent calls`
+  - `revoke() does not fire the Eloquent updated event when called a second time`
+
+---
+
 ## [2.0.2] — 2026-09-07
 
 ### Fixed
@@ -205,8 +218,9 @@ Features under consideration for future releases:
 
 ---
 
+[2.0.3]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.3
 [2.0.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.2
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.3...HEAD

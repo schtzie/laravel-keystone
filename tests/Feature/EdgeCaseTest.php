@@ -556,28 +556,122 @@ describe('D — Cache Layer', function () {
 describe('E — Key Lifecycle', function () {
 
     /**
-     * Bug: Revoking the same key twice must be idempotent (no exception, and
-     * revoked_at is not reset). This verifies the fix in Keystone::revoke()
-     * that guards against overwriting an existing revoked_at timestamp.
+     * RELIABILITY NOTE — Why naive timestamp comparison is insufficient:
+     *
+     * Calling revoke() twice in the same second on SQLite produces IDENTICAL
+     * revoked_at strings even WITHOUT an idempotency guard, because SQLite
+     * stores datetime at 1-second precision. The test would pass by accident.
+     *
+     * Correct approach: use $this->travelTo() to advance the clock by several
+     * seconds between the two revoke() calls. If the guard is absent, the
+     * second update() writes the new later timestamp and the test fails.
+     * If the guard is present, the timestamp stays frozen at T=0.
      */
-    it('revoking the same key twice is idempotent', function () {
+
+    /**
+     * Core idempotency: revoked_at must equal the FIRST call's timestamp
+     * even when 5 seconds have elapsed before the second call.
+     */
+    it('revoke() preserves the original revoked_at timestamp when called a second time (time-travel safe)', function () {
         $user  = edgeUser();
         $key   = edgeKey($user);
         $model = $key['model'];
 
-        $model->revoke();
+        $t0 = now();
+        $this->travelTo($t0);
+
+        $model->revoke(); // first call at T=0
         $firstRevoke = $model->fresh()->revoked_at;
 
-        // Call revoke() a second time — revoked_at must stay unchanged
-        $model->revoke();
+        $this->travelTo($t0->addSeconds(5)); // advance 5 seconds
+        $model->revoke(); // second call at T+5 — must be a no-op
         $secondRevoke = $model->fresh()->revoked_at;
 
-        // revoked_at should be identical — the idempotency guard prevents re-write
-        $this->assertEquals(
-            $firstRevoke?->toDateTimeString(),
-            $secondRevoke?->toDateTimeString(),
-            'revoked_at was changed on second revoke call'
-        );
+        $this->travelBack();
+
+        expect($secondRevoke?->toDateTimeString())
+            ->toBe(
+                $firstRevoke?->toDateTimeString(),
+                'revoked_at was overwritten on the second revoke() call — idempotency guard is missing'
+            );
+    });
+
+    /**
+     * revoke() called 5 times (each 1 second apart): revoked_at must always
+     * match the very first call's timestamp regardless of how many times it runs.
+     */
+    it('revoke() called five times never updates revoked_at after the first call', function () {
+        $user  = edgeUser();
+        $key   = edgeKey($user);
+        $model = $key['model'];
+
+        $t0 = now();
+        $this->travelTo($t0);
+
+        $model->revoke(); // first call — sets revoked_at
+        $firstRevoke = $model->fresh()->revoked_at;
+
+        foreach (range(1, 4) as $i) {
+            $this->travelTo($t0->addSeconds($i));
+            $model->revoke(); // each call should be a no-op
+        }
+
+        $this->travelBack();
+
+        $finalRevoke = $model->fresh()->revoked_at;
+        expect($finalRevoke?->toDateTimeString())
+            ->toBe(
+                $firstRevoke?->toDateTimeString(),
+                'revoked_at changed after repeated revoke() calls — idempotency guard is missing'
+            );
+    });
+
+    /**
+     * revoke() must return true on BOTH the first and subsequent idempotent
+     * calls — callers must not need to special-case a second revoke.
+     */
+    it('revoke() returns true on both the first and subsequent idempotent calls', function () {
+        $user  = edgeUser();
+        $key   = edgeKey($user);
+        $model = $key['model'];
+
+        $t0 = now();
+        $this->travelTo($t0);
+        expect($model->revoke())->toBeTrue(); // first call
+
+        $this->travelTo($t0->addSeconds(2));
+        expect($model->revoke())->toBeTrue(); // idempotent call — must also return true
+
+        $this->travelBack();
+    });
+
+    /**
+     * The Eloquent `updated` event must NOT fire on a second revoke() call.
+     * Firing it would evict the Redis cache entry and force an unnecessary DB
+     * round-trip on the very next authenticated request.
+     */
+    it('revoke() does not fire the Eloquent updated event when called a second time', function () {
+        $user  = edgeUser();
+        $key   = edgeKey($user);
+        $model = $key['model'];
+
+        $t0 = now();
+        $this->travelTo($t0);
+        $model->revoke(); // first call — event fires (expected behaviour)
+
+        // Count events fired ONLY by the second call
+        $eventCount = 0;
+        \Schtzie\Keystone\Models\Keystone::updated(static function () use (&$eventCount): void {
+            $eventCount++;
+        });
+
+        $this->travelTo($t0->addSeconds(3));
+        $model->revoke(); // second call — must NOT fire updated event
+
+        $this->travelBack();
+
+        expect($eventCount)
+            ->toBe(0, 'Eloquent updated event fired on idempotent revoke() call — causes unnecessary cache eviction');
     });
 
     /**
