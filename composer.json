@@ -13,7 +13,7 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Schatzie"
+            "name": "Schtzie"
         }
     ],
     "require": {
@@ -40,13 +40,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Schatzie\\Keystone\\": "src/"
+            "Schtzie\\Keystone\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Schatzie\\Keystone\\Tests\\": "tests/",
-            "Schatzie\\Keystone\\Tests\\Support\\": "tests/Support/"
+            "Schtzie\\Keystone\\Tests\\": "tests/",
+            "Schtzie\\Keystone\\Tests\\Support\\": "tests/Support/"
         }
     },
     "scripts": {
@@ -60,10 +60,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Schatzie\\Keystone\\KeystoneServiceProvider"
+                "Schtzie\\Keystone\\KeystoneServiceProvider"
             ],
             "aliases": {
-                "Keystone": "Schatzie\\Keystone\\Facades\\Keystone"
+                "Keystone": "Schtzie\\Keystone\\Facades\\Keystone"
             }
         }
     },

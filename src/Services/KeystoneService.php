@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Services;
+namespace Schtzie\Keystone\Services;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Models\Keystone;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Models\Keystone;
 
 /**
  * Orchestrates the Redis-first Client resolution pipeline:

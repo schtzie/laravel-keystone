@@ -5,9 +5,9 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Tests\Fixtures\User;
-use Schatzie\Keystone\Tests\Support\FakeTenant;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Tests\Fixtures\User;
+use Schtzie\Keystone\Tests\Support\FakeTenant;
 
 // ── Setup ──────────────────────────────────────────────────────────────────
 

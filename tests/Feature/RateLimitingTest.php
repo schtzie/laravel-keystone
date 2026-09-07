@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Schatzie\Keystone\Tests\Fixtures\User;
+use Schtzie\Keystone\Tests\Fixtures\User;
 use Illuminate\Support\Facades\RateLimiter;
 
 beforeEach(function () {

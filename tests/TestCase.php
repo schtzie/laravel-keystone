@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Tests;
+namespace Schtzie\Keystone\Tests;
 
 use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
-use Schatzie\Keystone\KeystoneServiceProvider;
+use Schtzie\Keystone\KeystoneServiceProvider;
 
 abstract class TestCase extends OrchestraTestCase
 {
@@ -18,7 +18,7 @@ abstract class TestCase extends OrchestraTestCase
     protected function getPackageAliases($app): array
     {
         return [
-            'Keystone' => \Schatzie\Keystone\Facades\Keystone::class,
+            'Keystone' => \Schtzie\Keystone\Facades\Keystone::class,
         ];
     }
 

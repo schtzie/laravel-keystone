@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Schatzie\Keystone\Tests\Fixtures\User;
+use Schtzie\Keystone\Tests\Fixtures\User;
 
 beforeEach(function () {
     Route::middleware('api.key')->get('/protected', fn () => 'ok');

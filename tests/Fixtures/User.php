@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Tests\Fixtures;
+namespace Schtzie\Keystone\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Model;
-use Schatzie\Keystone\Traits\HasKeystones;
+use Schtzie\Keystone\Traits\HasKeystones;
 
 /**
  * Minimal Eloquent model fixture used across all test suites.

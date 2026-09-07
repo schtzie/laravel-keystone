@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Cache;
+namespace Schtzie\Keystone\Cache;
 
 use Illuminate\Contracts\Cache\Repository;
-use Schatzie\Keystone\Models\Keystone;
+use Schtzie\Keystone\Models\Keystone;
 
 /**
  * Single source of truth for all Keystone Redis interactions.

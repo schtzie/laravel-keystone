@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Schatzie\Keystone\Http\Middleware;
+namespace Schtzie\Keystone\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Schatzie\Keystone\Cache\KeystoneKeyCacheRepository;
-use Schatzie\Keystone\Models\Keystone;
-use Schatzie\Keystone\Services\KeystoneService;
+use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Models\Keystone;
+use Schtzie\Keystone\Services\KeystoneService;
 use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\Response;
