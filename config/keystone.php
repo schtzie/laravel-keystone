@@ -3,79 +3,178 @@
 declare(strict_types=1);
 
 return [
-    // ── Database ───────────────────────────────────────────────────────────
+
+    /*
+    |--------------------------------------------------------------------------
+    | Database Table Name
+    |--------------------------------------------------------------------------
+    |
+    | This option specifies the name of the database table used by Keystone
+    | to store API client keys, secrets, scopes, and owner morph relations.
+    | You can customize this if it conflicts with existing table names.
+    |
+    */
+
     'table' => 'keystoneables',
 
-    // ── Key Generation ─────────────────────────────────────────────────────
-    // Optional prefix prepended to generated client values (e.g. "ks_abc123...")
+    /*
+    |--------------------------------------------------------------------------
+    | API Key Prefix
+    |--------------------------------------------------------------------------
+    |
+    | An optional prefix prepended to all generated API client keys (e.g., "ks_").
+    | This helps identify keys visually in client applications, headers, and logs.
+    |
+    */
+
     'prefix' => 'ks_',
 
-    // Byte-length of randomly generated client and secret values.
-    // Final string length will be key_length * 2 (hex-encoded) + prefix length.
+    /*
+    |--------------------------------------------------------------------------
+    | Key Byte Length
+    |--------------------------------------------------------------------------
+    |
+    | The byte length of randomly generated API client keys and secrets.
+    | The final string length will be (key_length * 2) plus the prefix length.
+    | For example, a key_length of 40 yields an 80-character hex string.
+    |
+    */
+
     'key_length' => 40,
 
-    // ── Request Resolution ─────────────────────────────────────────────────
-    // Header name the client sends the plain client in.
+    /*
+    |--------------------------------------------------------------------------
+    | Client ID Header Name
+    |--------------------------------------------------------------------------
+    |
+    | The HTTP header name sent by clients containing their public API client ID
+    | (e.g. "X-Client-Id").
+    |
+    */
+
     'header' => 'X-Client-Id',
 
-    // Fallback query parameter when the header is absent.
+    /*
+    |--------------------------------------------------------------------------
+    | Fallback Query Parameter
+    |--------------------------------------------------------------------------
+    |
+    | The HTTP query parameter name checked when the Client ID header is absent.
+    | Useful for simple GET request authentication or webhooks (e.g., "?client=ks_...").
+    |
+    */
+
     'query_param' => 'client',
 
-    // Header name the client sends the HMAC-SHA256 signature in.
-    // Signature = hash_hmac('sha256', $client, $secret)
+    /*
+    |--------------------------------------------------------------------------
+    | API Signature Header Name
+    |--------------------------------------------------------------------------
+    |
+    | The HTTP header name sent by clients containing the HMAC-SHA256 request
+    | signature calculated as hash_hmac('sha256', $clientKey, $clientSecret).
+    |
+    */
+
     'signature_header' => 'X-API-Signature',
 
-    // ── Auth ───────────────────────────────────────────────────────────────
-    // Laravel auth guard to log the resolved keystoneable owner into.
-    // Set to null to skip auth-guard login (owner is still bound in the IoC).
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Guard(s)
+    |--------------------------------------------------------------------------
+    |
+    | The Laravel auth guard(s) to log the resolved keystoneable owner into upon
+    | successful authentication. Accepts a single guard name ('web'), an array
+    | of guard names (['web', 'api']), or a comma-separated string ('web,api').
+    | Set to null to skip guard login (the owner is still bound to the request).
+    |
+    */
+
     'guard' => null,
 
-    // Scopes assigned to newly created keys when no scopes are specified.
+    /*
+    |--------------------------------------------------------------------------
+    | Default Scopes
+    |--------------------------------------------------------------------------
+    |
+    | The scopes assigned to newly created API keys when no explicit scopes
+    | are provided during key creation.
+    |
+    */
+
     'default_scopes' => [],
 
-    // Default rate limit (requests per minute) applied to all keys.
-    // Set to 0 to disable global rate limiting. Individual keys can override this.
+    /*
+    |--------------------------------------------------------------------------
+    | Global Rate Limit
+    |--------------------------------------------------------------------------
+    |
+    | Default requests-per-minute limit applied to all API keys. Set to 0 to
+    | disable global rate limiting. Individual keys can override this value.
+    |
+    */
+
     'rate_limit' => (int) env('KEYSTONE_RATE_LIMIT', 60),
 
-    // ── Redis Cache ────────────────────────────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | Redis Cache Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configure Redis caching options to minimize database lookup overhead:
+    |
+    | - enabled: Master toggle. Set to false to bypass cache and query DB.
+    | - store: Cache store name defined in cache config (must be Redis-backed).
+    | - ttl: Time-to-live for cached credentials in seconds (null = no expiry).
+    | - prefix: Namespace prefix prepended to all Redis cache keys.
+    | - warm_on_miss: Automatically cache records retrieved during a DB miss.
+    | - refresh_on_use: Re-warm Redis entry in middleware terminate() post-auth.
+    |
+    */
+
     'cache' => [
-        // Master switch — set to false to always hit the database.
         'enabled' => true,
-
-        // Laravel cache store name. Must be a Redis-backed store.
         'store' => env('KEYSTONE_CACHE_STORE', 'redis'),
-
-        // Cache entry TTL in seconds. null = no expiry.
         'ttl' => (int) env('KEYSTONE_CACHE_TTL', 3600),
-
-        // Redis key namespace prefix.
         'prefix' => 'keystone',
-
-        // Write-through: populate Redis automatically on a DB cache-miss.
         'warm_on_miss' => true,
-
-        // Re-warm the Redis entry in middleware terminate() after each auth.
         'refresh_on_use' => true,
     ],
 
-    // ── Multi-Tenancy (stancl/tenancy v4) ──────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | Multi-Tenancy (stancl/tenancy v4)
+    |--------------------------------------------------------------------------
+    |
+    | Integration settings for stancl/tenancy v4 multi-tenant applications:
+    |
+    | - mode: Operating mode:
+    |     - 'none'      : Single-tenant application (default).
+    |     - 'single_db' : Shared database with tenant_id column + TenantScope.
+    |     - 'multi_db'  : Per-tenant database (tenancy manages connections).
+    | - tenant_id_column: Column name for tenant identifier (single_db mode only).
+    | - auto_register_bootstrapper: Automatically attach KeystoneBootstrapper
+    |   to tenancy bootstrapper stack when stancl/tenancy package is loaded.
+    |
+    */
+
     'tenancy' => [
-        // Operating mode:
-        //   'none'      — single-tenant (default)
-        //   'single_db' — shared database, tenant_id column + TenantScope
-        //   'multi_db'  — per-tenant database (stancl switches the connection)
         'mode' => env('KEYSTONE_TENANCY_MODE', 'none'),
-
-        // Column name used to store the tenant identifier (single_db mode only).
         'tenant_id_column' => 'tenant_id',
-
-        // Automatically append KeystoneBootstrapper to stancl/tenancy v4's
-        // bootstrapper stack when the package is detected. Set to false if
-        // you want to register it manually via your TenancyServiceProvider.
         'auto_register_bootstrapper' => true,
     ],
 
-    // ── Maintenance ────────────────────────────────────────────────────────
-    // keystone:prune will delete revoked keys older than this many days.
+    /*
+    |--------------------------------------------------------------------------
+    | Pruning & Maintenance
+    |--------------------------------------------------------------------------
+    |
+    | Configure retention for revoked client keys. Running `php artisan keystone:prune`
+    | will permanently delete revoked keys that have been revoked for longer
+    | than the specified number of days.
+    |
+    */
+
     'prune_revoked_after_days' => 30,
+
 ];

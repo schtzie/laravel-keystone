@@ -40,16 +40,16 @@ function edgeRoute(): void
     Route::middleware('api.key')->get('/edge', fn () => response()->json(['ok' => true]));
 }
 
-function edgeRequest(object $tc, array $key, array $headers = [], array $server = []): \Illuminate\Testing\TestResponse
+function edgeRequest(object $tc, array $key, array $headers = [], array $server = []): Illuminate\Testing\TestResponse
 {
     $sig = hash_hmac('sha256', $key['client'], $key['secret']);
 
     return $tc->withServerVariables($server)
-              ->withHeaders(array_merge([
-                  'X-Client-Id'     => $key['client'],
-                  'X-API-Signature' => $sig,
-              ], $headers))
-              ->getJson('/edge');
+        ->withHeaders(array_merge([
+            'X-Client-Id' => $key['client'],
+            'X-API-Signature' => $sig,
+        ], $headers))
+        ->getJson('/edge');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -66,12 +66,12 @@ describe('A — Authentication & Signature', function () {
      */
     it('accepts client via query param instead of header', function () {
         $user = edgeUser();
-        $key  = edgeKey($user);
-        $sig  = hash_hmac('sha256', $key['client'], $key['secret']);
+        $key = edgeKey($user);
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
 
         $this->withHeaders(['X-API-Signature' => $sig])
-             ->getJson('/edge?client='.$key['client'])
-             ->assertOk();
+            ->getJson('/edge?client='.$key['client'])
+            ->assertOk();
     });
 
     /**
@@ -80,7 +80,7 @@ describe('A — Authentication & Signature', function () {
      */
     it('returns 401 for an empty string client header', function () {
         $this->withHeaders([
-            'X-Client-Id'     => '',
+            'X-Client-Id' => '',
             'X-API-Signature' => 'any',
         ])->getJson('/edge')->assertUnauthorized();
     });
@@ -91,10 +91,10 @@ describe('A — Authentication & Signature', function () {
      */
     it('returns 401 for an empty string signature header', function () {
         $user = edgeUser();
-        $key  = edgeKey($user);
+        $key = edgeKey($user);
 
         $this->withHeaders([
-            'X-Client-Id'     => $key['client'],
+            'X-Client-Id' => $key['client'],
             'X-API-Signature' => '',
         ])->getJson('/edge')->assertUnauthorized();
     });
@@ -105,7 +105,7 @@ describe('A — Authentication & Signature', function () {
      */
     it('rejects a key whose expiry equals exactly the current time', function () {
         $user = edgeUser();
-        $key  = $user->createKeystone('Boundary Key', [], now()->toImmutable());
+        $key = $user->createKeystone('Boundary Key', [], now()->toImmutable());
 
         edgeRequest($this, $key)->assertUnauthorized();
     });
@@ -115,7 +115,7 @@ describe('A — Authentication & Signature', function () {
      */
     it('allows a key that expires in the future (1 second away)', function () {
         $user = edgeUser();
-        $key  = $user->createKeystone('Almost Expired', [], now()->addSecond()->toImmutable());
+        $key = $user->createKeystone('Almost Expired', [], now()->addSecond()->toImmutable());
 
         edgeRequest($this, $key)->assertOk();
     });
@@ -126,7 +126,7 @@ describe('A — Authentication & Signature', function () {
      */
     it('allows the same key to authenticate on consecutive requests', function () {
         $user = edgeUser();
-        $key  = edgeKey($user);
+        $key = edgeKey($user);
 
         edgeRequest($this, $key)->assertOk();
         edgeRequest($this, $key)->assertOk();
@@ -138,8 +138,8 @@ describe('A — Authentication & Signature', function () {
      * model attribute, not a cached stale value).
      */
     it('treats a key as valid again after revoked_at is cleared', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         // Revoke it
@@ -149,7 +149,7 @@ describe('A — Authentication & Signature', function () {
         // Restore it by clearing revoked_at (simulates admin un-revoke)
         $model->updateQuietly(['revoked_at' => null]);
         // Flush the in-memory resolved map and cache so the middleware re-reads
-        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+        app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
         app(KeystoneKeyCacheRepository::class)->forget($key['client']);
 
         edgeRequest($this, $key)->assertOk();
@@ -167,7 +167,7 @@ describe('A — Authentication & Signature', function () {
         $crossSig = hash_hmac('sha256', $keyA['client'], $keyB['secret']);
 
         $this->withHeaders([
-            'X-Client-Id'     => $keyA['client'],
+            'X-Client-Id' => $keyA['client'],
             'X-API-Signature' => $crossSig,
         ])->getJson('/edge')->assertUnauthorized();
     });
@@ -180,11 +180,11 @@ describe('A — Authentication & Signature', function () {
         Route::middleware('api.key:admin')->get('/edge-scoped', fn () => 'ok');
 
         $user = edgeUser();
-        $key  = $user->createKeystone('No Scope Key', []);
-        $sig  = hash_hmac('sha256', $key['client'], $key['secret']);
+        $key = $user->createKeystone('No Scope Key', []);
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
 
         $this->withHeaders([
-            'X-Client-Id'     => $key['client'],
+            'X-Client-Id' => $key['client'],
             'X-API-Signature' => $sig,
         ])->getJson('/edge-scoped')->assertUnauthorized();
     });
@@ -197,11 +197,11 @@ describe('A — Authentication & Signature', function () {
         Route::middleware('api.key:read,write')->get('/edge-multi-scope', fn () => 'ok');
 
         $user = edgeUser();
-        $key  = $user->createKeystone('Partial Scope', ['read']); // missing 'write'
-        $sig  = hash_hmac('sha256', $key['client'], $key['secret']);
+        $key = $user->createKeystone('Partial Scope', ['read']); // missing 'write'
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
 
         $this->withHeaders([
-            'X-Client-Id'     => $key['client'],
+            'X-Client-Id' => $key['client'],
             'X-API-Signature' => $sig,
         ])->getJson('/edge-multi-scope')->assertUnauthorized();
     });
@@ -222,7 +222,7 @@ describe('B — IP Filtering', function () {
      */
     it('blocks a request when IP is in both allowlist and blocklist (blocklist wins)', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, [
+        $key = edgeKey($user, [
             'ip_allowlist' => ['127.0.0.1'],
             'ip_blocklist' => ['127.0.0.1'],
         ]);
@@ -238,7 +238,7 @@ describe('B — IP Filtering', function () {
      */
     it('allows any IP when ip_allowlist is an empty array', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['ip_allowlist' => []]);
+        $key = edgeKey($user, ['ip_allowlist' => []]);
 
         edgeRequest($this, $key, [], ['REMOTE_ADDR' => '10.0.0.1'])->assertOk();
     });
@@ -248,7 +248,7 @@ describe('B — IP Filtering', function () {
      */
     it('allows any IP when ip_blocklist is an empty array', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['ip_blocklist' => []]);
+        $key = edgeKey($user, ['ip_blocklist' => []]);
 
         edgeRequest($this, $key, [], ['REMOTE_ADDR' => '10.0.0.1'])->assertOk();
     });
@@ -259,7 +259,7 @@ describe('B — IP Filtering', function () {
      */
     it('blocks the first IP in a CIDR blocklist subnet', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['ip_blocklist' => ['192.168.10.0/24']]);
+        $key = edgeKey($user, ['ip_blocklist' => ['192.168.10.0/24']]);
 
         edgeRequest($this, $key, [], ['REMOTE_ADDR' => '192.168.10.1'])
             ->assertForbidden()
@@ -271,7 +271,7 @@ describe('B — IP Filtering', function () {
      */
     it('allows an IP that is just outside the CIDR blocklist subnet', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['ip_blocklist' => ['192.168.10.0/24']]);
+        $key = edgeKey($user, ['ip_blocklist' => ['192.168.10.0/24']]);
 
         edgeRequest($this, $key, [], ['REMOTE_ADDR' => '192.168.11.1'])->assertOk();
     });
@@ -282,15 +282,15 @@ describe('B — IP Filtering', function () {
      */
     it('returns 401 (not 403) when signature is wrong even if IP is blocked', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['ip_blocklist' => ['127.0.0.1']]);
+        $key = edgeKey($user, ['ip_blocklist' => ['127.0.0.1']]);
 
         $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
-             ->withHeaders([
-                 'X-Client-Id'     => $key['client'],
-                 'X-API-Signature' => 'wrong-sig',
-             ])
-             ->getJson('/edge')
-             ->assertUnauthorized(); // 401, not 403
+            ->withHeaders([
+                'X-Client-Id' => $key['client'],
+                'X-API-Signature' => 'wrong-sig',
+            ])
+            ->getJson('/edge')
+            ->assertUnauthorized(); // 401, not 403
     });
 
     /**
@@ -299,9 +299,9 @@ describe('B — IP Filtering', function () {
      */
     it('returns 403 for a blocked IP even when the key is also rate-limited', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, [
+        $key = edgeKey($user, [
             'ip_blocklist' => ['127.0.0.1'],
-            'rate_limit'   => 1,
+            'rate_limit' => 1,
         ]);
 
         // Exhaust the rate limit first
@@ -331,7 +331,7 @@ describe('C — Rate Limiting', function () {
      */
     it('includes Retry-After and X-Keystone-RateLimit-Reset on a 429 response', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['rate_limit' => 1]);
+        $key = edgeKey($user, ['rate_limit' => 1]);
         RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
 
         edgeRequest($this, $key)->assertOk();
@@ -348,7 +348,7 @@ describe('C — Rate Limiting', function () {
      */
     it('allows requests again after the rate limit window is cleared', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['rate_limit' => 1]);
+        $key = edgeKey($user, ['rate_limit' => 1]);
         $limitKey = 'keystone:rate_limit:'.$key['model']->id;
 
         RateLimiter::clear($limitKey);
@@ -366,7 +366,7 @@ describe('C — Rate Limiting', function () {
      */
     it('never reports a negative remaining count on success', function () {
         $user = edgeUser();
-        $key  = edgeKey($user, ['rate_limit' => 3]);
+        $key = edgeKey($user, ['rate_limit' => 3]);
         RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
 
         $response = edgeRequest($this, $key);
@@ -384,7 +384,7 @@ describe('C — Rate Limiting', function () {
         config(['keystone.rate_limit' => 2]);
 
         $user = edgeUser();
-        $key  = edgeKey($user, ['rate_limit' => null]);
+        $key = edgeKey($user, ['rate_limit' => null]);
         RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
 
         $r1 = edgeRequest($this, $key);
@@ -405,7 +405,7 @@ describe('C — Rate Limiting', function () {
         config(['keystone.rate_limit' => 1.9]);
 
         $user = edgeUser();
-        $key  = edgeKey($user, ['rate_limit' => null]);
+        $key = edgeKey($user, ['rate_limit' => null]);
         RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
 
         $response = edgeRequest($this, $key);
@@ -420,8 +420,8 @@ describe('C — Rate Limiting', function () {
     it('tracks rate limits independently for keys belonging to different owners', function () {
         $userA = edgeUser();
         $userB = edgeUser();
-        $keyA  = edgeKey($userA, ['rate_limit' => 1]);
-        $keyB  = edgeKey($userB, ['rate_limit' => 1]);
+        $keyA = edgeKey($userA, ['rate_limit' => 1]);
+        $keyB = edgeKey($userB, ['rate_limit' => 1]);
 
         RateLimiter::clear('keystone:rate_limit:'.$keyA['model']->id);
         RateLimiter::clear('keystone:rate_limit:'.$keyB['model']->id);
@@ -448,8 +448,8 @@ describe('D — Cache Layer', function () {
      * Tests that cache entries hold revocation state correctly.
      */
     it('rejects a revoked key even when its cache entry is warm', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $cache = app(KeystoneKeyCacheRepository::class);
 
         // Warm the cache first
@@ -467,8 +467,8 @@ describe('D — Cache Layer', function () {
      * without a 500 error.
      */
     it('falls back to the database when cached JSON is corrupted', function () {
-        $user   = edgeUser();
-        $key    = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $prefix = config('keystone.cache.prefix', 'keystone');
         $cacheKey = $prefix.':key:'.$key['client'];
 
@@ -484,9 +484,9 @@ describe('D — Cache Layer', function () {
      * Tests that cache eviction on rotate is complete.
      */
     it('rejects the old key credentials after rotation', function () {
-        $user    = edgeUser();
-        $oldKey  = edgeKey($user);
-        $cache   = app(KeystoneKeyCacheRepository::class);
+        $user = edgeUser();
+        $oldKey = edgeKey($user);
+        $cache = app(KeystoneKeyCacheRepository::class);
 
         $cache->put($oldKey['model']);
         $user->rotateKeystone($oldKey['model']);
@@ -502,7 +502,7 @@ describe('D — Cache Layer', function () {
         config(['keystone.cache.enabled' => false]);
 
         $user = edgeUser();
-        $key  = edgeKey($user);
+        $key = edgeKey($user);
 
         edgeRequest($this, $key)->assertOk();
 
@@ -520,12 +520,12 @@ describe('D — Cache Layer', function () {
      * not throw an exception.
      */
     it('forgetOwner does not throw when no cached keys exist for the owner', function () {
-        $user  = edgeUser();
+        $user = edgeUser();
         $cache = app(KeystoneKeyCacheRepository::class);
 
         // Expect no exception
         expect(fn () => $cache->forgetOwner(User::class, $user->getKey()))
-            ->not->toThrow(\Throwable::class);
+            ->not->toThrow(Throwable::class);
     });
 
     /**
@@ -534,15 +534,15 @@ describe('D — Cache Layer', function () {
      * If attributes are stripped during serialisation, auth silently breaks.
      */
     it('can verify signature against a key that was served from cache', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $cache = app(KeystoneKeyCacheRepository::class);
 
         // Manually warm the cache
         $cache->put($key['model']);
 
         // Flush in-memory resolved map to force a cache (not memory) hit
-        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+        app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
 
         edgeRequest($this, $key)->assertOk();
     });
@@ -573,8 +573,8 @@ describe('E — Key Lifecycle', function () {
      * even when 5 seconds have elapsed before the second call.
      */
     it('revoke() preserves the original revoked_at timestamp when called a second time (time-travel safe)', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         $t0 = now();
@@ -601,8 +601,8 @@ describe('E — Key Lifecycle', function () {
      * match the very first call's timestamp regardless of how many times it runs.
      */
     it('revoke() called five times never updates revoked_at after the first call', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         $t0 = now();
@@ -631,8 +631,8 @@ describe('E — Key Lifecycle', function () {
      * calls — callers must not need to special-case a second revoke.
      */
     it('revoke() returns true on both the first and subsequent idempotent calls', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         $t0 = now();
@@ -651,8 +651,8 @@ describe('E — Key Lifecycle', function () {
      * round-trip on the very next authenticated request.
      */
     it('revoke() does not fire the Eloquent updated event when called a second time', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         $t0 = now();
@@ -661,7 +661,7 @@ describe('E — Key Lifecycle', function () {
 
         // Count events fired ONLY by the second call
         $eventCount = 0;
-        \Schtzie\Keystone\Models\Keystone::updated(static function () use (&$eventCount): void {
+        Schtzie\Keystone\Models\Keystone::updated(static function () use (&$eventCount): void {
             $eventCount++;
         });
 
@@ -680,10 +680,10 @@ describe('E — Key Lifecycle', function () {
      */
     it('rotateKeystone preserves ip_allowlist, ip_blocklist, and rate_limit', function () {
         $user = edgeUser();
-        $old  = $user->createKeystone('Configured Key', [], null, [
+        $old = $user->createKeystone('Configured Key', [], null, [
             'ip_allowlist' => ['10.0.0.0/8'],
             'ip_blocklist' => ['10.0.0.5'],
-            'rate_limit'   => 50,
+            'rate_limit' => 50,
         ]);
 
         $new = $user->rotateKeystone($old['model']);
@@ -699,7 +699,7 @@ describe('E — Key Lifecycle', function () {
      */
     it('rotateKeystone preserves scopes from the old key', function () {
         $user = edgeUser();
-        $old  = $user->createKeystone('Scoped Key', ['read', 'write']);
+        $old = $user->createKeystone('Scoped Key', ['read', 'write']);
 
         $new = $user->rotateKeystone($old['model']);
 
@@ -725,9 +725,9 @@ describe('E — Key Lifecycle', function () {
      */
     it('revokeAllKeystones only counts and affects active keys', function () {
         $user = edgeUser();
-        $k1   = edgeKey($user);
-        $k2   = edgeKey($user);
-        $k3   = edgeKey($user);
+        $k1 = edgeKey($user);
+        $k2 = edgeKey($user);
+        $k3 = edgeKey($user);
 
         // Pre-revoke k1
         $k1['model']->revoke();
@@ -743,8 +743,8 @@ describe('E — Key Lifecycle', function () {
      * must work without an exception.
      */
     it('revokeKeystone accepts an integer key ID', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         $result = $user->revokeKeystone($model->id);
@@ -766,8 +766,8 @@ describe('F — Key Generation', function () {
      */
     it('generates unique client values on consecutive createKeystone calls', function () {
         $user = edgeUser();
-        $k1   = edgeKey($user);
-        $k2   = edgeKey($user);
+        $k1 = edgeKey($user);
+        $k2 = edgeKey($user);
 
         expect($k1['client'])->not->toBe($k2['client']);
     });
@@ -777,8 +777,8 @@ describe('F — Key Generation', function () {
      */
     it('generates unique secrets on consecutive createKeystone calls', function () {
         $user = edgeUser();
-        $k1   = edgeKey($user);
-        $k2   = edgeKey($user);
+        $k1 = edgeKey($user);
+        $k2 = edgeKey($user);
 
         expect($k1['secret'])->not->toBe($k2['secret']);
     });
@@ -791,7 +791,7 @@ describe('F — Key Generation', function () {
         config(['keystone.prefix' => 'myapp_']);
 
         $user = edgeUser();
-        $key  = edgeKey($user);
+        $key = edgeKey($user);
 
         expect($key['client'])->toStartWith('myapp_');
     })->after(fn () => config(['keystone.prefix' => 'ks_']));
@@ -800,8 +800,8 @@ describe('F — Key Generation', function () {
      * Bug: An empty $scopes array should store [] in the DB, not NULL.
      */
     it('stores an empty array for scopes when none are provided', function () {
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         expect($model->scopes)->toBeArray()->toBeEmpty();
@@ -818,8 +818,8 @@ describe('F — Key Generation', function () {
     it('falls back to default_scopes config when an empty scopes array is passed', function () {
         config(['keystone.default_scopes' => ['read']]);
 
-        $user  = edgeUser();
-        $key   = $user->createKeystone('Scoped Key', []); // empty → fallback
+        $user = edgeUser();
+        $key = $user->createKeystone('Scoped Key', []); // empty → fallback
         $model = $key['model'];
 
         // With current `?: config(...)` behaviour, empty triggers default
@@ -843,14 +843,14 @@ describe('G — Middleware Ordering', function () {
         Route::middleware('api.key:admin')->get('/edge-order', fn () => 'ok');
 
         $user = edgeUser();
-        $key  = $user->createKeystone('No Admin', ['read'], null, ['rate_limit' => 1]);
+        $key = $user->createKeystone('No Admin', ['read'], null, ['rate_limit' => 1]);
         $limitKey = 'keystone:rate_limit:'.$key['model']->id;
 
         RateLimiter::clear($limitKey);
 
         $sig = hash_hmac('sha256', $key['client'], $key['secret']);
         $headers = [
-            'X-Client-Id'     => $key['client'],
+            'X-Client-Id' => $key['client'],
             'X-API-Signature' => $sig,
         ];
 
@@ -873,9 +873,9 @@ describe('G — Middleware Ordering', function () {
         edgeRoute();
 
         $user = edgeUser();
-        $key  = edgeKey($user, [
+        $key = edgeKey($user, [
             'ip_blocklist' => ['1.2.3.4'],
-            'rate_limit'   => 5,
+            'rate_limit' => 5,
         ]);
         $limitKey = 'keystone:rate_limit:'.$key['model']->id;
         RateLimiter::clear($limitKey);
@@ -897,19 +897,19 @@ describe('G — Middleware Ordering', function () {
         Route::middleware('api.key:admin')->get('/edge-scope-ip', fn () => 'ok');
 
         $user = edgeUser();
-        $key  = $user->createKeystone('No Admin', ['read'], null, [
+        $key = $user->createKeystone('No Admin', ['read'], null, [
             'ip_blocklist' => ['5.5.5.5'],
         ]);
         $sig = hash_hmac('sha256', $key['client'], $key['secret']);
 
         $this->withServerVariables(['REMOTE_ADDR' => '5.5.5.5'])
-             ->withHeaders([
-                 'X-Client-Id'     => $key['client'],
-                 'X-API-Signature' => $sig,
-             ])
-             ->getJson('/edge-scope-ip')
-             ->assertForbidden()
-             ->assertJson(['message' => 'IP address blocked.']);
+            ->withHeaders([
+                'X-Client-Id' => $key['client'],
+                'X-API-Signature' => $sig,
+            ])
+            ->getJson('/edge-scope-ip')
+            ->assertForbidden()
+            ->assertJson(['message' => 'IP address blocked.']);
     });
 
     /**
@@ -920,13 +920,13 @@ describe('G — Middleware Ordering', function () {
     it('does not update last_used_at for an unauthorized request', function () {
         edgeRoute();
 
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $model = $key['model'];
 
         // Make a bad request (wrong signature)
         $this->withHeaders([
-            'X-Client-Id'     => $key['client'],
+            'X-Client-Id' => $key['client'],
             'X-API-Signature' => 'wrong',
         ])->getJson('/edge')->assertUnauthorized();
 
@@ -951,8 +951,8 @@ describe('H — Config / Environment', function () {
         config(['keystone.header' => 'X-Custom-Client']);
 
         $user = edgeUser();
-        $key  = edgeKey($user);
-        $sig  = hash_hmac('sha256', $key['client'], $key['secret']);
+        $key = edgeKey($user);
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
 
         $this->withHeaders([
             'X-Custom-Client' => $key['client'],
@@ -968,12 +968,12 @@ describe('H — Config / Environment', function () {
         config(['keystone.signature_header' => 'X-My-Sig']);
 
         $user = edgeUser();
-        $key  = edgeKey($user);
-        $sig  = hash_hmac('sha256', $key['client'], $key['secret']);
+        $key = edgeKey($user);
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
 
         $this->withHeaders([
             'X-Client-Id' => $key['client'],
-            'X-My-Sig'    => $sig,
+            'X-My-Sig' => $sig,
         ])->getJson('/edge')->assertOk();
     })->after(fn () => config(['keystone.signature_header' => 'X-API-Signature']));
 
@@ -984,13 +984,13 @@ describe('H — Config / Environment', function () {
     it('does not re-warm cache after a request when refresh_on_use is false', function () {
         config(['keystone.cache.refresh_on_use' => false]);
 
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $cache = app(KeystoneKeyCacheRepository::class);
 
         // Ensure cache starts empty
         $cache->forget($key['client']);
-        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+        app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
 
         edgeRequest($this, $key)->assertOk();
 
@@ -1012,27 +1012,92 @@ describe('H — Config / Environment', function () {
      */
     it('does not populate cache on DB miss when warm_on_miss is false', function () {
         config([
-            'keystone.cache.warm_on_miss'   => false,
+            'keystone.cache.warm_on_miss' => false,
             'keystone.cache.refresh_on_use' => false,
         ]);
 
-        $user  = edgeUser();
-        $key   = edgeKey($user);
+        $user = edgeUser();
+        $key = edgeKey($user);
         $cache = app(KeystoneKeyCacheRepository::class);
 
         // Ensure both the in-memory map and the cache are empty before the request
         $cache->forget($key['client']);
-        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+        app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
 
         edgeRequest($this, $key)->assertOk();
 
         // The persistent cache store must remain empty — no write-through occurred
-        $prefix   = config('keystone.cache.prefix', 'keystone');
+        $prefix = config('keystone.cache.prefix', 'keystone');
         $cacheKey = $prefix.':key:'.$key['client'];
-        expect(\Illuminate\Support\Facades\Cache::store('array')->has($cacheKey))->toBeFalse();
+        expect(Cache::store('array')->has($cacheKey))->toBeFalse();
     })->after(fn () => config([
-        'keystone.cache.warm_on_miss'   => true,
+        'keystone.cache.warm_on_miss' => true,
         'keystone.cache.refresh_on_use' => true,
     ]));
+
+    /**
+     * Bug: When keystone.guard is set to a valid guard string (e.g., 'web'),
+     * Auth::guard($guard)->user() must return the authenticated owner model if it
+     * implements Authenticatable.
+     */
+    it('authenticates the owner into the specified auth guard when keystone.guard is set', function () {
+        config(['keystone.guard' => 'web']);
+
+        $authUser = new class extends Illuminate\Foundation\Auth\User
+        {
+            use Schtzie\Keystone\Traits\HasKeystones;
+
+            protected $table = 'users';
+
+            protected $guarded = [];
+        };
+
+        $user = $authUser::create(['name' => 'Auth User']);
+        $key = $user->createKeystone('Auth Key');
+
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
+
+        $this->withHeaders([
+            'X-Client-Id' => $key['client'],
+            'X-API-Signature' => $sig,
+        ])->getJson('/edge')->assertOk();
+
+        expect(Illuminate\Support\Facades\Auth::guard('web')->user())
+            ->not->toBeNull()
+            ->and(Illuminate\Support\Facades\Auth::guard('web')->id())
+            ->toBe($user->getKey());
+    })->after(fn () => config(['keystone.guard' => null]));
+
+    /**
+     * Bug: When keystone.guard is set to an array or comma-separated string of guards,
+     * Auth::guard($guard)->user() must return the owner for all specified guards.
+     */
+    it('authenticates the owner into multiple guards when an array or comma-separated string is passed', function () {
+        config([
+            'auth.guards.api' => ['driver' => 'session', 'provider' => 'users'],
+            'keystone.guard' => ['web', 'api'],
+        ]);
+
+        $authUser = new class extends Illuminate\Foundation\Auth\User
+        {
+            use Schtzie\Keystone\Traits\HasKeystones;
+
+            protected $table = 'users';
+
+            protected $guarded = [];
+        };
+
+        $user = $authUser::create(['name' => 'Multi Guard User']);
+        $key = $user->createKeystone('Multi Key');
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
+
+        $this->withHeaders([
+            'X-Client-Id' => $key['client'],
+            'X-API-Signature' => $sig,
+        ])->getJson('/edge')->assertOk();
+
+        expect(Illuminate\Support\Facades\Auth::guard('web')->user())->not->toBeNull()
+            ->and(Illuminate\Support\Facades\Auth::guard('api')->user())->not->toBeNull();
+    })->after(fn () => config(['keystone.guard' => null]));
 
 });

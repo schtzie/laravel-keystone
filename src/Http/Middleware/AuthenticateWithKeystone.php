@@ -107,12 +107,17 @@ final class AuthenticateWithKeystone
         app()->instance($owner::class, $owner);
         $request->attributes->set('keystoneable', $owner);
 
-        // Optional auth guard login
-        $guard = config('keystone.guard');
+        // Optional auth guard login (supports string, array, or comma-separated guards)
+        $guards = config('keystone.guard');
 
-        if (is_string($guard) && $guard !== '') {
-            if ($owner instanceof \Illuminate\Contracts\Auth\Authenticatable) {
-                Auth::guard($guard)->setUser($owner);
+        if ($guards !== null && $owner instanceof \Illuminate\Contracts\Auth\Authenticatable) {
+            $guards = is_array($guards) ? $guards : explode(',', (string) $guards);
+
+            foreach ($guards as $guard) {
+                $guard = trim((string) $guard);
+                if ($guard !== '') {
+                    Auth::guard($guard)->setUser($owner);
+                }
             }
         }
 
