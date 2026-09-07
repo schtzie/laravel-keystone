@@ -2,45 +2,104 @@ name: Tests
 
 on:
   push:
-    branches:
-      - main
+    branches: ["**"]
   pull_request:
-    branches:
-      - main
-
-permissions:
-  contents: read
+    branches: ["**"]
 
 jobs:
   test:
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        php: [ 8.2, 8.3, 8.4 ]
-        laravel: [ 11.*, 12.*, 13.* ]
-        stability: [ prefer-lowest, prefer-stable ]
-        exclude:
-          - php: 8.2
-            laravel: 13.*
 
-    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }} - ${{ matrix.stability }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Laravel 11 — Testbench 9.x
+          # PHP 8.2–8.4
+          - php: "8.2"
+            laravel: "11.*"
+            testbench: "^9.0"
+
+          - php: "8.3"
+            laravel: "11.*"
+            testbench: "^9.0"
+
+          - php: "8.4"
+            laravel: "11.*"
+            testbench: "^9.0"
+
+          # Laravel 12 — Testbench 10.x
+          # PHP 8.2–8.5
+          - php: "8.2"
+            laravel: "12.*"
+            testbench: "^10.0"
+
+          - php: "8.3"
+            laravel: "12.*"
+            testbench: "^10.0"
+
+          - php: "8.4"
+            laravel: "12.*"
+            testbench: "^10.0"
+
+          - php: "8.5"
+            laravel: "12.*"
+            testbench: "^10.0"
+
+          # Laravel 13 — Testbench 11.x
+          # PHP 8.3–8.5
+          - php: "8.3"
+            laravel: "13.*"
+            testbench: "^11.0"
+
+          - php: "8.4"
+            laravel: "13.*"
+            testbench: "^11.0"
+
+          - php: "8.5"
+            laravel: "13.*"
+            testbench: "^11.0"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
-      - name: Setup PHP
+      - name: Set up PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
+          extensions: mbstring, pdo, sqlite, pdo_sqlite
           coverage: none
 
-      - name: Install dependencies
-        run: |
-          composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
-          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+      - name: Cache Composer dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.composer/cache/files
+          key: composer-php${{ matrix.php }}-laravel${{ matrix.laravel }}-${{ hashFiles('composer.json') }}
+          restore-keys: |
+            composer-php${{ matrix.php }}-laravel${{ matrix.laravel }}-
+            composer-php${{ matrix.php }}-
 
-      - name: Execute tests
+      - name: Install dependencies
+        env:
+          COMPOSER_NO_AUDIT: 1
+          COMPOSER_NO_BLOCKING: 1
+        run: |
+          composer require \
+            "laravel/framework:${{ matrix.laravel }}" \
+            "orchestra/testbench:${{ matrix.testbench }}" \
+            --dev \
+            --no-interaction \
+            --no-update
+
+          composer update \
+            --prefer-dist \
+            --no-interaction \
+            --prefer-stable \
+            --no-audit \
+            --no-blocking \
+            --with-all-dependencies
+
+      - name: Run tests
         run: composer test
