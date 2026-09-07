@@ -39,8 +39,9 @@ return new class extends Migration
 
             // Optional JSON array of allowed scopes, e.g. ["read","write"]
             $table->json('scopes')->nullable();
-
-            // Optional expiry timestamp
+            $table->json('ip_allowlist')->nullable();
+            $table->json('ip_blocklist')->nullable();
+            $table->integer('rate_limit')->nullable();
             $table->timestamp('expires_at')->nullable();
 
             // Usage tracking — written asynchronously in middleware terminate()

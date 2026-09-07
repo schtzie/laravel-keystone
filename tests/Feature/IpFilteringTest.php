@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Route;
+use Schatzie\Keystone\Tests\Fixtures\User;
+
+beforeEach(function () {
+    Route::middleware('api.key')->get('/protected', fn () => 'ok');
+});
+
+function getProtectedIp(object $testCase, array $key, array $serverVars = []) {
+    $client = $key['client'];
+    $secret = $key['secret'];
+    $signature = hash_hmac('sha256', $client, $secret);
+
+    return $testCase->withServerVariables($serverVars)
+             ->withHeaders([
+                 'X-Client-Id' => $client,
+                 'X-API-Signature' => $signature,
+             ])
+             ->get('/protected');
+}
+
+it('allows request when IP is in allowlist', function () {
+    $user = User::create(['name' => 'Test']);
+    $key = $user->createKeystone('Test Key', [], null, ['ip_allowlist' => ['127.0.0.1']]);
+
+    getProtectedIp($this, $key, ['REMOTE_ADDR' => '127.0.0.1'])
+         ->assertOk();
+});
+
+it('rejects request when IP is not in allowlist', function () {
+    $user = User::create(['name' => 'Test']);
+    $key = $user->createKeystone('Test Key', [], null, ['ip_allowlist' => ['192.168.1.1']]);
+
+    getProtectedIp($this, $key, ['REMOTE_ADDR' => '127.0.0.1'])
+         ->assertForbidden()
+         ->assertJson(['message' => 'IP address not allowed.']);
+});
+
+it('rejects request when IP is in blocklist', function () {
+    $user = User::create(['name' => 'Test']);
+    $key = $user->createKeystone('Test Key', [], null, ['ip_blocklist' => ['127.0.0.1']]);
+
+    getProtectedIp($this, $key, ['REMOTE_ADDR' => '127.0.0.1'])
+         ->assertForbidden()
+         ->assertJson(['message' => 'IP address blocked.']);
+});
+
+it('supports CIDR notation in allowlist', function () {
+    $user = User::create(['name' => 'Test']);
+    $key = $user->createKeystone('Test Key', [], null, ['ip_allowlist' => ['192.168.1.0/24']]);
+
+    getProtectedIp($this, $key, ['REMOTE_ADDR' => '192.168.1.50'])
+         ->assertOk();
+
+    getProtectedIp($this, $key, ['REMOTE_ADDR' => '10.0.0.1'])
+         ->assertForbidden();
+});

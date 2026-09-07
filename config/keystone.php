@@ -33,6 +33,10 @@ return [
     // Scopes assigned to newly created keys when no scopes are specified.
     'default_scopes' => [],
 
+    // Default rate limit (requests per minute) applied to all keys.
+    // Set to 0 to disable global rate limiting. Individual keys can override this.
+    'rate_limit' => (int) env('KEYSTONE_RATE_LIMIT', 60),
+
     // ── Redis Cache ────────────────────────────────────────────────────────
     'cache' => [
         // Master switch — set to false to always hit the database.

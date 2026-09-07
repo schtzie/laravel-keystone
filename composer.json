@@ -1,5 +1,5 @@
 {
-    "name": "schatzie/laravel-keystone",
+    "name": "schtzie/laravel-keystone",
     "description": "API key management for Laravel — attach API keys to any Eloquent model, authenticate requests via HMAC SHA-256, cache keys in Redis, and support stancl/tenancy v4 multi-tenant architectures.",
     "keywords": [
         "laravel",
@@ -74,6 +74,6 @@
         },
         "sort-packages": true
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }

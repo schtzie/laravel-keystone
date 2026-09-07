@@ -152,8 +152,8 @@ Three operating modes controlled by `KEYSTONE_TENANCY_MODE`:
 
 Features under consideration for future releases:
 
-- [ ] IP allowlist / blocklist per Client
-- [ ] Per-key rate limiting
+- [x] IP allowlist / blocklist per Client
+- [x] Per-key rate limiting
 - [ ] Webhook signing support (outbound HMAC signing)
 - [ ] Key usage analytics endpoint
 - [ ] Automatic key expiry notifications
