@@ -121,7 +121,7 @@ final class AuthenticateWithKeystone
 
         $response = $next($request);
 
-        if (!is_null($limitKey) && isset($rateLimit)) {
+        if (!is_null($limitKey)) {
             $response->headers->set('X-Keystone-RateLimit-Limit', (string) $rateLimit);
             $response->headers->set('X-Keystone-RateLimit-Remaining', (string) RateLimiter::retriesLeft($limitKey, $rateLimit));
         }

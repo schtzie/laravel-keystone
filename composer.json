@@ -29,14 +29,11 @@
         "stancl/tenancy": "Required for multi-tenant support via stancl/tenancy v4 (^4.0)."
     },
     "require-dev": {
-        "captainhook/captainhook-phar": "^5.27",
-        "inertiajs/inertia-laravel": "^2.0",
         "larastan/larastan": "^3.8.1",
         "laravel/pint": "^1.26.0",
         "orchestra/testbench": "^9.0|^10.8|^11.0",
         "pestphp/pest": "^3.0|^4.0",
-        "pestphp/pest-plugin-laravel": "^3.0|^4.0",
-        "ramsey/conventional-commits": "^1.6"
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0"
     },
     "autoload": {
         "psr-4": {
@@ -54,8 +51,7 @@
         "test-coverage": "pest --coverage",
         "analyse": "phpstan analyse --memory-limit=-1",
         "analyse-baseline": "phpstan analyse --memory-limit=-1 --generate-baseline",
-        "pint": "vendor/bin/pint",
-        "install-hooks": "vendor/bin/captainhook install --only-enabled"
+        "pint": "vendor/bin/pint"
     },
     "extra": {
         "laravel": {
@@ -69,7 +65,6 @@
     },
     "config": {
         "allow-plugins": {
-            "captainhook/captainhook-phar": true,
             "pestphp/pest-plugin": true
         },
         "sort-packages": true

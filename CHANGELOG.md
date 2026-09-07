@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [2.0.1] — 2026-09-07
+
+### Fixed
+- **PHPStan Static Analysis**: Removed redundant `isset($rateLimit)` check in `AuthenticateWithKeystone` middleware response header block to satisfy PHPStan 2.2 strict type checking.
+
+### Added
+- **Rate Limiting Test Suite**: Added 5 edge-case scenarios in `RateLimitingTest.php` covering disabled rate limits, per-key precedence over global config, zero/negative limits, key isolation, and string numeric limit values.
+
+### Changed
+- **Development Dependencies**: Removed unused development packages (`captainhook/captainhook-phar`, `ramsey/conventional-commits`) and associated configuration entries from `composer.json`.
+
+---
+
 ## [2.0.0] — 2026-09-07
 
 ### Added
@@ -182,6 +195,7 @@ Features under consideration for future releases:
 
 ---
 
+[2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.1...HEAD
