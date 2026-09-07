@@ -67,7 +67,7 @@ Authorized keys are stored in **Redis** to eliminate database round-trips on hot
 ## Installation
 
 ```bash
-composer require schatzie/laravel-keystone
+composer require schtzie/laravel-keystone
 ```
 
 The service provider and `Keystone` facade are auto-discovered via `composer.json`.
