@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [2.0.2] — 2026-09-07
+
+### Fixed
+- **`Keystone::revoke()` Idempotency**: Added an early-return guard so calling `revoke()` on an already-revoked key is a no-op. Previously, the unconditional `update(['revoked_at' => now()])` would silently overwrite the original revocation timestamp and fire an unnecessary Eloquent `updated` event (triggering a spurious Redis cache eviction).
+
+### Added
+- **`EdgeCaseTest` — 48 regression & edge-case scenarios**: New `tests/Feature/EdgeCaseTest.php` covering authentication & signature edge cases, IP filtering conflict resolution, rate limiting header correctness, cache layer resilience (corrupted JSON fallback, stale revoked entries), key lifecycle idempotency, key generation entropy, middleware execution ordering, and config/environment overrides.
+
+---
+
 ## [2.0.1] — 2026-09-07
 
 ### Fixed
@@ -195,7 +205,8 @@ Features under consideration for future releases:
 
 ---
 
+[2.0.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.2
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.2...HEAD

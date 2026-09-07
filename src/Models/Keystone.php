@@ -125,9 +125,18 @@ class Keystone extends Model
     /**
      * Soft-revoke this key.
      * Fires the Eloquent `updated` event which triggers cache invalidation.
+     *
+     * Idempotent — if the key is already revoked, this is a no-op and the
+     * original revoked_at timestamp is preserved.
      */
     public function revoke(): bool
     {
+        // Idempotent — if the key is already revoked, this is a no-op and the
+        // original revoked_at timestamp is preserved.
+        if ($this->revoked_at !== null) {
+            return true;
+        }
+
         return $this->update(['revoked_at' => now()]);
     }
 
