@@ -6,6 +6,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [2.0.0] — 2026-09-07
+
+### Added
+
+#### Security — Per-Key IP Filtering
+- **IP Allowlisting & Blocklisting**: Restrict API key access per-client via `ip_allowlist` and `ip_blocklist` arrays stored on the `Keystone` model:
+  - **`ip_allowlist`**: Only accept requests originating from specified IPs or subnet ranges; rejects non-matching IPs with `403 Forbidden` (`IP address not allowed.`).
+  - **`ip_blocklist`**: Explicitly deny access to blacklisted IPs; rejects matching IPs with `403 Forbidden` (`IP address blocked.`).
+  - **CIDR Subnet Notation Support**: Full support for exact IPs (e.g., `127.0.0.1`) as well as subnet ranges (e.g., `192.168.1.0/24`).
+- Integrated directly into the `AuthenticateWithKeystone` middleware validation pipeline.
+
+#### Security & Quality — Rate Limiting & Testing
+- **Per-Key & Fallback Rate Limiting**: Enforce custom rate limits per API key, falling back to global limits in `config/keystone.php`.
+- **Feature Tests**: Added comprehensive Pest test suites in `IpFilteringTest` and `RateLimitingTest`.
+
+### Changed
+- **Namespace Migration**: Rebranded vendor namespace from `Schatzie` to `Schtzie` across all source files, test fixtures, and documentation.
+- **Composer Metadata**: Updated package name to `schtzie/laravel-keystone`, author name to `Schtzie`, repository URLs, PSR-4 autoload mappings, and Laravel auto-discovery service provider / facade registrations.
+
+---
+
 ## [1.0.0] — 2026-05-23
 
 Initial release of Laravel Keystone.
@@ -161,5 +182,6 @@ Features under consideration for future releases:
 
 ---
 
-[1.0.0]: https://github.com/schatzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schatzie/laravel-keystone/compare/v1.0.0...HEAD
+[2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
+[1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.0...HEAD
