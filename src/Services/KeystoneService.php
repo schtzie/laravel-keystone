@@ -128,4 +128,49 @@ final class KeystoneService
     {
         $this->resolved = [];
     }
+
+    // ── Analytics ──────────────────────────────────────────────────────────
+
+    /**
+     * Return a structured usage analytics payload for the given client key.
+     *
+     * Uses the same cache-aware lookup as the middleware pipeline so a DB
+     * round-trip is avoided on warm-cache hits.
+     *
+     * Returns null when the client does not exist.
+     *
+     * @return array{
+     *     client: string,
+     *     name: string,
+     *     scopes: array<string>|null,
+     *     active: bool,
+     *     rate_limit: int|null,
+     *     created_at: string,
+     *     expires_at: string|null,
+     *     revoked_at: string|null,
+     *     last_used_at: string|null,
+     *     last_used_ip: string|null,
+     * }|null
+     */
+    public function analytics(string $client): ?array
+    {
+        $key = $this->findByKeystone($client);
+
+        if ($key === null) {
+            return null;
+        }
+
+        return [
+            'client'       => $key->client,
+            'name'         => $key->name,
+            'scopes'       => $key->scopes,
+            'active'       => $key->isValid(),
+            'rate_limit'   => $key->rate_limit,
+            'created_at'   => $key->created_at->toIso8601String(),
+            'expires_at'   => $key->expires_at?->toIso8601String(),
+            'revoked_at'   => $key->revoked_at?->toIso8601String(),
+            'last_used_at' => $key->last_used_at?->toIso8601String(),
+            'last_used_ip' => $key->last_used_ip,
+        ];
+    }
 }

@@ -49,6 +49,7 @@ final class KeystoneServiceProvider extends ServiceProvider
         $this->registerCommands();
         $this->registerModelObservers();
         $this->registerTenancyBootstrapper();
+        $this->registerAnalyticsRoute();
     }
 
     // ── Private Helpers ────────────────────────────────────────────────────
@@ -131,5 +132,46 @@ final class KeystoneServiceProvider extends ServiceProvider
                 $tenancy->bootstrappers[] = KeystoneBootstrapper::class;
             }
         });
+    }
+
+    /**
+     * Register the built-in analytics endpoint when enabled.
+     *
+     * Route: GET /{prefix}/{client}
+     *
+     * The route is protected by the api.key middleware — so the request must
+     * already carry a valid Client + HMAC signature pair. An additional
+     * ownership check ensures a key can only read its own analytics data.
+     */
+    private function registerAnalyticsRoute(): void
+    {
+        if (! config('keystone.analytics.enabled', true)) {
+            return;
+        }
+
+        $prefix = ltrim((string) config('keystone.analytics.prefix', 'keystone/analytics'), '/');
+
+        /** @var \Illuminate\Routing\Router $router */
+        $router = $this->app->make('router');
+
+        $router->middleware('api.key')->get(
+            $prefix.'/{client}',
+            function (\Illuminate\Http\Request $request, string $client): \Illuminate\Http\JsonResponse {
+                // Ownership check — the authenticated key must match the requested slug
+                $authenticated = $request->attributes->get('_keystone_client');
+
+                if (! $authenticated instanceof Keystone || $authenticated->client !== $client) {
+                    return response()->json(['message' => 'Forbidden.'], 403);
+                }
+
+                $analytics = app(KeystoneService::class)->analytics($client);
+
+                if ($analytics === null) {
+                    return response()->json(['message' => 'Not Found.'], 404);
+                }
+
+                return response()->json($analytics);
+            }
+        );
     }
 }

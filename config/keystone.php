@@ -177,4 +177,24 @@ return [
 
     'prune_revoked_after_days' => 30,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Key Usage Analytics
+    |--------------------------------------------------------------------------
+    |
+    | Configure the built-in analytics endpoint that surfaces per-key usage
+    | metrics (last usage timestamp, last IP, lifecycle dates, scopes, etc.)
+    | for authenticated callers.
+    |
+    | - enabled: Master toggle. Set to false to disable the route entirely.
+    | - prefix:  URI prefix for the analytics route. The resolved path will be
+    |             "/{prefix}/{client}", e.g. "/keystone/analytics/ks_abc123".
+    |
+    */
+
+    'analytics' => [
+        'enabled' => (bool) env('KEYSTONE_ANALYTICS_ENABLED', false),
+        'prefix'  => env('KEYSTONE_ANALYTICS_PREFIX', 'keystone/analytics'),
+    ],
+
 ];

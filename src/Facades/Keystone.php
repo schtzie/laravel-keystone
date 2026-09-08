@@ -13,6 +13,7 @@ use Schtzie\Keystone\Services\KeystoneService;
  * @method static array{client: string, secret: string, model: \Schtzie\Keystone\Models\Keystone} generate(\Illuminate\Database\Eloquent\Model $owner, string $name, array<string, mixed> $options = [])
  * @method static void invalidate(string $client)
  * @method static void flushResolved()
+ * @method static array{client: string, name: string, scopes: array<string>|null, active: bool, rate_limit: int|null, created_at: string, expires_at: string|null, revoked_at: string|null, last_used_at: string|null, last_used_ip: string|null}|null analytics(string $client)
  *
  * @see KeystoneService
  */

@@ -4,6 +4,23 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-09-07
+
+### Added
+- **Key Usage Analytics Endpoint**: New `GET /{prefix}/{client}` route (default: `/keystone/analytics/{client}`) that returns a structured JSON payload of per-key usage metrics for the authenticated caller's own key:
+  - `client`, `name`, `scopes`, `active` — identity and status fields
+  - `rate_limit` — configured per-key rate limit
+  - `created_at`, `expires_at`, `revoked_at` — full lifecycle timestamps (ISO 8601)
+  - `last_used_at`, `last_used_ip` — last successful authentication metadata
+- **`KeystoneService::analytics(string $client): ?array`** — cache-aware service method (in-memory → Redis → DB) that powers the endpoint and is directly usable in application code.
+- **`Keystone` Facade** — added `analytics()` IDE `@method` docblock entry.
+- **`AnalyticsTest`** — full Pest feature suite covering: correct response structure, cross-key `403` ownership enforcement, unauthenticated `401`, `404` for non-existent clients, null optional fields, `last_used_at`/`last_used_ip` reflection after `markUsed()`, and revoked key state.
+
+### Changed
+- **Config** — Added `analytics` section to `config/keystone.php` with `enabled` (master toggle, env: `KEYSTONE_ANALYTICS_ENABLED`) and `prefix` (URI prefix, env: `KEYSTONE_ANALYTICS_PREFIX`, default: `keystone/analytics`) options.
+
+---
+
 ## [2.1.0] — 2026-09-07
 
 ### Added
@@ -221,16 +238,18 @@ Features under consideration for future releases:
 - [x] IP allowlist / blocklist per Client
 - [x] Per-key rate limiting
 - [ ] Webhook signing support (outbound HMAC signing)
-- [ ] Key usage analytics endpoint
+- [x] Key usage analytics endpoint
 - [ ] Automatic key expiry notifications
 - [ ] Dashboard UI via Filament / Livewire
 
 ---
 
+[2.2.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.2.0
+[2.1.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.0
 [2.0.4]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.4
 [2.0.3]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.3
 [2.0.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.2
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.0.4...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.2.0...HEAD

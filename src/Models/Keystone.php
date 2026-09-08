@@ -39,13 +39,13 @@ class Keystone extends Model
 
     /** @var array<string, string> */
     protected $casts = [
-        'scopes' => 'array',
+        'scopes'       => 'array',
         'ip_allowlist' => 'array',
         'ip_blocklist' => 'array',
-        'rate_limit' => 'integer',
-        'expires_at' => 'immutable_datetime',
+        'rate_limit'   => 'integer',
+        'expires_at'   => 'immutable_datetime',
         'last_used_at' => 'immutable_datetime',
-        'revoked_at' => 'immutable_datetime',
+        'revoked_at'   => 'immutable_datetime',
     ];
 
     public function getTable(): string
