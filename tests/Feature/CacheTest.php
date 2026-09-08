@@ -47,6 +47,8 @@ it('populates Redis after first DB lookup (cache miss)', function (): void {
 });
 
 it('serves the key from Redis on subsequent requests without hitting the DB', function (): void {
+    $this->freezeTime();
+
     [$user, $result] = makeUserWithKey();
 
     Route::middleware('api.key')->get('/cache-hit', fn () => response()->json(['ok' => true]));

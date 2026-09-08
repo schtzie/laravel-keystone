@@ -59,7 +59,7 @@ final class KeystoneKeyCacheRepository
             return null;
         }
 
-        return (new Keystone())->setRawAttributes($attributes);
+        return (new Keystone())->newFromBuilder($attributes);
     }
 
     /**

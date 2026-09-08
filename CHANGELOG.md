@@ -8,6 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ### Fixed
 - **Tenancy Bootstrapper Registration — `getBootstrappersUsing` Closure**: Replaced the intermediate `getBootstrappers()` / `setBootstrappers()` approach (v2.1.1) with stancl/tenancy v4's public `getBootstrappersUsing` callable property in `KeystoneServiceProvider::registerTenancyBootstrapper()`. The new implementation wraps any previously registered callable, falls back to `config('tenancy.bootstrappers')`, and appends `KeystoneBootstrapper` — making it fully composable with other packages that also register bootstrappers via the same hook.
+- **Cache Model Hydration (`newFromBuilder`)**: Replaced `setRawAttributes($attributes)` with `newFromBuilder($attributes)` in `KeystoneKeyCacheRepository::get()`. Models retrieved from Redis now correctly have `$exists = true` and synced `$original` attributes, preventing `markUsed()` in `AuthenticateWithKeystone::terminate()` from considering all attributes dirty and issuing unnecessary DB update queries.
+- **`CacheTest` Subsecond Query Test Isolation**: Added `$this->freezeTime()` to `it('serves the key from Redis on subsequent requests without hitting the DB')` to prevent microsecond clock shifts on PHP 8.5 / Laravel 13 from triggering dirty attribute updates in `markUsed()`.
 
 ---
 
