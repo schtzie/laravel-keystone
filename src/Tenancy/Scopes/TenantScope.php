@@ -27,12 +27,25 @@ final class TenantScope implements Scope
             return;
         }
 
-        if (! function_exists('tenant') || tenant() === null) {
+        if (! function_exists('tenant')) {
             return;
         }
 
-        $column = $model->getTable().'.'.(string) config('keystone.tenancy.tenant_id_column', 'tenant_id');
+        /** @var mixed $tenant */
+        $tenant = tenant();
 
-        $builder->where($column, tenant()->getTenantKey());
+        if (! is_object($tenant) || ! method_exists($tenant, 'getTenantKey')) {
+            return;
+        }
+
+        $colConfig = config('keystone.tenancy.tenant_id_column', 'tenant_id');
+        $column = $model->getTable().'.'.(is_string($colConfig) ? $colConfig : 'tenant_id');
+
+        $tenantKey = $tenant->getTenantKey();
+
+        if (is_string($tenantKey) || is_numeric($tenantKey)) {
+            $builder->where($column, (string) $tenantKey);
+        }
     }
 }
+

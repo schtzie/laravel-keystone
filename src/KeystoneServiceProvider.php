@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Schtzie\Keystone;
 
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
 use Schtzie\Keystone\Commands\PruneKeystonesCommand;
@@ -16,6 +17,11 @@ final class KeystoneServiceProvider extends ServiceProvider
 {
     // ── Registration ───────────────────────────────────────────────────────
 
+    /**
+     * Register services in the container.
+     *
+     * @return void
+     */
     public function register(): void
     {
         $this->mergeConfigFrom(
@@ -23,25 +29,38 @@ final class KeystoneServiceProvider extends ServiceProvider
             'keystone',
         );
 
-        $this->app->singleton(KeystoneKeyCacheRepository::class, function ($app): KeystoneKeyCacheRepository {
+        $this->app->singleton(KeystoneKeyCacheRepository::class, function (Application $app): KeystoneKeyCacheRepository {
+            /** @var \Illuminate\Cache\CacheManager $cacheManager */
+            $cacheManager = $app->make('cache');
+            $storeName = config('keystone.cache.store', 'redis');
+
+            $prefixConfig = config('keystone.cache.prefix', 'keystone');
+            $ttlConfig = config('keystone.cache.ttl');
+
             return new KeystoneKeyCacheRepository(
-                cache: $app['cache']->store(config('keystone.cache.store', 'redis')),
-                prefix: config('keystone.cache.prefix', 'keystone'),
-                ttl: config('keystone.cache.ttl') !== null
-                    ? (int) config('keystone.cache.ttl')
-                    : null,
+                cache: $cacheManager->store(is_string($storeName) ? $storeName : 'redis'),
+                prefix: is_string($prefixConfig) ? $prefixConfig : 'keystone',
+                ttl: is_numeric($ttlConfig) ? (int) $ttlConfig : null,
             );
         });
 
-        $this->app->singleton(KeystoneService::class, function ($app): KeystoneService {
+        $this->app->singleton(KeystoneService::class, function (Application $app): KeystoneService {
+            /** @var KeystoneKeyCacheRepository $cacheRepo */
+            $cacheRepo = $app->make(KeystoneKeyCacheRepository::class);
+
             return new KeystoneService(
-                cache: $app->make(KeystoneKeyCacheRepository::class),
+                cache: $cacheRepo,
             );
         });
     }
 
     // ── Boot ───────────────────────────────────────────────────────────────
 
+    /**
+     * Bootstrap application services.
+     *
+     * @return void
+     */
     public function boot(): void
     {
         $this->registerPublishables();
@@ -53,6 +72,11 @@ final class KeystoneServiceProvider extends ServiceProvider
 
     // ── Private Helpers ────────────────────────────────────────────────────
 
+    /**
+     * Register publishable assets.
+     *
+     * @return void
+     */
     private function registerPublishables(): void
     {
         if (! $this->app->runningInConsole()) {
@@ -75,6 +99,11 @@ final class KeystoneServiceProvider extends ServiceProvider
         ], 'keystone-migrations-single-db');
     }
 
+    /**
+     * Register route middleware.
+     *
+     * @return void
+     */
     private function registerMiddleware(): void
     {
         /** @var \Illuminate\Routing\Router $router */
@@ -82,6 +111,11 @@ final class KeystoneServiceProvider extends ServiceProvider
         $router->aliasMiddleware('api.key', AuthenticateWithKeystone::class);
     }
 
+    /**
+     * Register Artisan commands.
+     *
+     * @return void
+     */
     private function registerCommands(): void
     {
         if ($this->app->runningInConsole()) {
@@ -92,18 +126,23 @@ final class KeystoneServiceProvider extends ServiceProvider
     /**
      * Automatically evict Redis cache entries when Keystone records are
      * updated (e.g. revoked) or hard-deleted.
+     *
+     * @return void
      */
     private function registerModelObservers(): void
     {
-        if (! class_exists(Keystone::class)) {
+        /** @var class-string<Keystone> $modelClass */
+        $modelClass = config('keystone.model', Keystone::class);
+
+        if (! class_exists($modelClass)) {
             return;
         }
 
-        Keystone::updated(function (Keystone $key): void {
+        $modelClass::updated(function (Keystone $key): void {
             app(KeystoneKeyCacheRepository::class)->forget($key->client);
         });
 
-        Keystone::deleted(function (Keystone $key): void {
+        $modelClass::deleted(function (Keystone $key): void {
             app(KeystoneKeyCacheRepository::class)->forget($key->client);
         });
     }
@@ -115,6 +154,8 @@ final class KeystoneServiceProvider extends ServiceProvider
      * Guards:
      *  - auto_register_bootstrapper config must be true
      *  - stancl/tenancy must be installed (class_exists check)
+     *
+     * @return void
      */
     private function registerTenancyBootstrapper(): void
     {
@@ -126,12 +167,13 @@ final class KeystoneServiceProvider extends ServiceProvider
             return;
         }
 
-        $this->app->resolving(\Stancl\Tenancy\Tenancy::class, function ($tenancy): void {
-            $previous = $tenancy->getBootstrappersUsing;
+        $this->app->resolving(\Stancl\Tenancy\Tenancy::class, function (object $tenancy): void {
+            $previous = $tenancy->getBootstrappersUsing ?? null; // @phpstan-ignore-line
 
-            $tenancy->getBootstrappersUsing = function ($tenant) use ($previous): array {
-                $bootstrappers = $previous
-                    ? $previous($tenant)
+            $tenancy->getBootstrappersUsing = function ($tenant) use ($previous): array { // @phpstan-ignore-line
+                /** @var array<int, string> $bootstrappers */
+                $bootstrappers = is_callable($previous)
+                    ? (array) $previous($tenant)
                     : (array) config('tenancy.bootstrappers', []);
 
                 if (! in_array(KeystoneBootstrapper::class, $bootstrappers, true)) {
@@ -143,3 +185,4 @@ final class KeystoneServiceProvider extends ServiceProvider
         });
     }
 }
+

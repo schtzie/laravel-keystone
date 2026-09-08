@@ -22,6 +22,8 @@ use Schtzie\Keystone\Models\Keystone;
  *   // $result['client']    — plain key to give the client
  *   // $result['secret'] — plain secret for HMAC signing (show once)
  *   // $result['model']      — the persisted Keystone model
+ *
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  */
 trait HasKeystones
 {
@@ -32,11 +34,14 @@ trait HasKeystones
      * In single_db mode the query is automatically scoped to the current tenant
      * via Keystone's TenantScope global scope.
      *
-     * @return MorphMany<Keystone>
+     * @return MorphMany<Keystone, $this>
      */
     public function keystones(): MorphMany
     {
-        return $this->morphMany(Keystone::class, 'keystoneable');
+        /** @var class-string<Keystone> $modelClass */
+        $modelClass = config('keystone.model', Keystone::class);
+
+        return $this->morphMany($modelClass, 'keystoneable');
     }
 
     // ── Key Management ─────────────────────────────────────────────────────
@@ -44,7 +49,10 @@ trait HasKeystones
     /**
      * Generate and persist a new Client pair for this model.
      *
-     * @param  array<int, string>  $scopes
+     * @param string $name
+     * @param array<int, string> $scopes
+     * @param CarbonImmutable|null $expiresAt
+     * @param array<string, mixed> $options
      * @return array{client: string, secret: string, model: Keystone}
      */
     public function createKeystone(
@@ -53,17 +61,24 @@ trait HasKeystones
         ?CarbonImmutable $expiresAt = null,
         array $options = [],
     ): array {
-        $plain = config('keystone.prefix', 'ks_')
-                .bin2hex(random_bytes((int) config('keystone.key_length', 40)));
+        $prefixConfig = config('keystone.prefix', 'ks_');
+        $prefix = is_string($prefixConfig) ? $prefixConfig : 'ks_';
 
-        $secret = bin2hex(random_bytes((int) config('keystone.key_length', 40)));
+        $keyLengthConfig = config('keystone.key_length', 40);
+        $keyLength = is_numeric($keyLengthConfig) ? (int) $keyLengthConfig : 40;
+
+        $plain = $prefix.bin2hex(random_bytes($keyLength));
+        $secret = bin2hex(random_bytes($keyLength));
+
+        $defaultScopesConfig = config('keystone.default_scopes', []);
+        $defaultScopes = is_array($defaultScopesConfig) ? $defaultScopesConfig : [];
 
         /** @var Keystone $model */
         $model = $this->keystones()->create(array_merge([
             'name' => $name,
             'client' => $plain,
             'secret' => $secret,
-            'scopes' => $scopes ?: config('keystone.default_scopes', []),
+            'scopes' => $scopes !== [] ? $scopes : $defaultScopes,
             'expires_at' => $expiresAt,
         ], $options));
 
@@ -76,6 +91,9 @@ trait HasKeystones
 
     /**
      * Revoke a specific Client by its ID or model instance.
+     *
+     * @param int|string|Keystone $key
+     * @return bool
      */
     public function revokeKeystone(int|string|Keystone $key): bool
     {
@@ -89,6 +107,8 @@ trait HasKeystones
     /**
      * Revoke all active Clients for this model.
      * Also purges the owner's Redis index.
+     *
+     * @return int
      */
     public function revokeAllKeystones(): int
     {
@@ -106,6 +126,7 @@ trait HasKeystones
     /**
      * Revoke an existing key and create a new one atomically.
      *
+     * @param int|string|Keystone $old
      * @return array{client: string, secret: string, model: Keystone}
      */
     public function rotateKeystone(int|string|Keystone $old): array
@@ -132,3 +153,4 @@ trait HasKeystones
         });
     }
 }
+

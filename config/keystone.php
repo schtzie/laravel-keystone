@@ -19,6 +19,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Keystone Eloquent Model Class
+    |--------------------------------------------------------------------------
+    |
+    | The Eloquent model class used by Keystone for key management, authentication,
+    | and caching. You can extend Schtzie\Keystone\Models\Keystone with custom
+    | relationships, accessors, or logic and specify your model class here.
+    |
+    */
+
+    'model' => \Schtzie\Keystone\Models\Keystone::class,
+
+    /*
+    |--------------------------------------------------------------------------
     | API Key Prefix
     |--------------------------------------------------------------------------
     |

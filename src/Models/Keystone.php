@@ -19,9 +19,9 @@ use Schtzie\Keystone\Tenancy\Concerns\TenantAware;
  * @property string $name
  * @property string $client
  * @property string $secret
- * @property array<string>|null $scopes
- * @property array<string>|null $ip_allowlist
- * @property array<string>|null $ip_blocklist
+ * @property array<int, string>|null $scopes
+ * @property array<int, string>|null $ip_allowlist
+ * @property array<int, string>|null $ip_blocklist
  * @property int|null $rate_limit
  * @property CarbonImmutable|null $expires_at
  * @property CarbonImmutable|null $last_used_at
@@ -29,6 +29,9 @@ use Schtzie\Keystone\Tenancy\Concerns\TenantAware;
  * @property CarbonImmutable|null $revoked_at
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
+ * @property-read Model|null $keystoneable
+ *
+ * @use TenantAware<self>
  */
 class Keystone extends Model
 {
@@ -48,9 +51,16 @@ class Keystone extends Model
         'revoked_at' => 'immutable_datetime',
     ];
 
+    /**
+     * Get the table associated with the model.
+     *
+     * @return string
+     */
     public function getTable(): string
     {
-        return (string) config('keystone.table', 'keystoneables');
+        $table = config('keystone.table', 'keystoneables');
+
+        return is_string($table) ? $table : 'keystoneables';
     }
 
     // ── Relationships ──────────────────────────────────────────────────────
@@ -108,6 +118,8 @@ class Keystone extends Model
 
     /**
      * Returns true if the key is not revoked and not expired.
+     *
+     * @return bool
      */
     public function isValid(): bool
     {
@@ -128,11 +140,11 @@ class Keystone extends Model
      *
      * Idempotent — if the key is already revoked, this is a no-op and the
      * original revoked_at timestamp is preserved.
+     *
+     * @return bool
      */
     public function revoke(): bool
     {
-        // Idempotent — if the key is already revoked, this is a no-op and the
-        // original revoked_at timestamp is preserved.
         if ($this->revoked_at !== null) {
             return true;
         }
@@ -143,6 +155,9 @@ class Keystone extends Model
     /**
      * Record usage metadata.
      * Called from middleware terminate() so it never adds request latency.
+     *
+     * @param Request $request
+     * @return void
      */
     public function markUsed(Request $request): void
     {
@@ -157,6 +172,9 @@ class Keystone extends Model
     /**
      * Verify that the given signature matches hash_hmac('sha256', client, secret).
      * Uses hash_equals to prevent timing attacks.
+     *
+     * @param string $signature
+     * @return bool
      */
     public function verifySignature(string $signature): bool
     {
@@ -165,3 +183,4 @@ class Keystone extends Model
         return hash_equals($expected, $signature);
     }
 }
+

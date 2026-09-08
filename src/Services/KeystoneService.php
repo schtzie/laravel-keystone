@@ -27,6 +27,9 @@ final class KeystoneService
      */
     private array $resolved = [];
 
+    /**
+     * @param KeystoneKeyCacheRepository $cache
+     */
     public function __construct(private readonly KeystoneKeyCacheRepository $cache) {}
 
     // ── Resolution ─────────────────────────────────────────────────────────
@@ -39,17 +42,29 @@ final class KeystoneService
      *
      * Returns null if the key is missing, invalid, revoked, expired,
      * or the signature does not match.
+     *
+     * @param Request $request
+     * @return Keystone|null
      */
     public function resolve(Request $request): ?Keystone
     {
-        $rawKey = $request->header(config('keystone.header', 'X-Client-Id'))
-               ?? $request->query(config('keystone.query_param', 'client'));
+        $headerNameConfig = config('keystone.header', 'X-Client-Id');
+        $headerName = is_string($headerNameConfig) ? $headerNameConfig : 'X-Client-Id';
+        $rawKey = $request->header($headerName);
+
+        if (! is_string($rawKey) || $rawKey === '') {
+            $queryNameConfig = config('keystone.query_param', 'client');
+            $queryName = is_string($queryNameConfig) ? $queryNameConfig : 'client';
+            $rawKey = $request->query($queryName);
+        }
 
         if (! is_string($rawKey) || $rawKey === '') {
             return null;
         }
 
-        $signature = $request->header(config('keystone.signature_header', 'X-API-Signature'));
+        $sigHeaderConfig = config('keystone.signature_header', 'X-API-Signature');
+        $sigHeader = is_string($sigHeaderConfig) ? $sigHeaderConfig : 'X-API-Signature';
+        $signature = $request->header($sigHeader);
 
         if (! is_string($signature) || $signature === '') {
             return null;
@@ -73,6 +88,9 @@ final class KeystoneService
      *   1. in-memory ($resolved map)
      *   2. Redis (KeystoneKeyCacheRepository)
      *   3. Database (with optional write-through to Redis)
+     *
+     * @param string $rawKey
+     * @return Keystone|null
      */
     public function findByKeystone(string $rawKey): ?Keystone
     {
@@ -85,7 +103,9 @@ final class KeystoneService
 
         // Database fallback
         if ($client === null) {
-            $client = Keystone::where('client', $rawKey)->first();
+            /** @var class-string<Keystone> $modelClass */
+            $modelClass = config('keystone.model', Keystone::class);
+            $client = $modelClass::where('client', $rawKey)->first();
 
             if ($client !== null && config('keystone.cache.warm_on_miss', true)) {
                 $this->cache->put($client);
@@ -98,13 +118,15 @@ final class KeystoneService
     /**
      * Convenience wrapper — delegates to the owner model's createKeystone().
      *
-     * @param  array{scopes?: array<int,string>, expires_at?: \Carbon\CarbonImmutable|null}  $options
+     * @param Model $owner
+     * @param string $name
+     * @param array{scopes?: array<int, string>, expires_at?: \Carbon\CarbonImmutable|null} $options
      * @return array{client: string, secret: string, model: Keystone}
      */
     public function generate(Model $owner, string $name, array $options = []): array
     {
-        /** @phpstan-ignore method.notFound */
-        return $owner->createKeystone(
+        /** @var array{client: string, secret: string, model: Keystone} */
+        return $owner->createKeystone( // @phpstan-ignore-line
             $name,
             $options['scopes'] ?? [],
             $options['expires_at'] ?? null,
@@ -112,7 +134,10 @@ final class KeystoneService
     }
 
     /**
-     * Force-evict an client from both the in-memory map and Redis.
+     * Force-evict a client from both the in-memory map and Redis.
+     *
+     * @param string $client
+     * @return void
      */
     public function invalidate(string $client): void
     {
@@ -123,9 +148,12 @@ final class KeystoneService
     /**
      * Clear the in-memory resolved map.
      * Called by KeystoneBootstrapper on every tenant switch.
+     *
+     * @return void
      */
     public function flushResolved(): void
     {
         $this->resolved = [];
     }
 }
+
