@@ -13,9 +13,14 @@ use Schtzie\Keystone\Tenancy\Scopes\TenantScope;
  *
  * The trait is always mixed in, but the scope/stamp logic is a no-op when
  * the tenancy mode is not 'single_db' or tenancy is not initialised.
+ *
+ * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  */
 trait TenantAware
 {
+    /**
+     * Boot the tenant aware trait for a model.
+     */
     public static function bootTenantAware(): void
     {
         // Always register the scope — it guards itself with a mode check inside.
@@ -26,15 +31,26 @@ trait TenantAware
                 return;
             }
 
-            if (! function_exists('tenant') || tenant() === null) {
+            if (! function_exists('tenant')) {
                 return;
             }
 
-            $col = (string) config('keystone.tenancy.tenant_id_column', 'tenant_id');
+            /** @var mixed $tenant */
+            $tenant = tenant();
+
+            if (! is_object($tenant) || ! method_exists($tenant, 'getTenantKey')) {
+                return;
+            }
+
+            $colConfig = config('keystone.tenancy.tenant_id_column', 'tenant_id');
+            $col = is_string($colConfig) ? $colConfig : 'tenant_id';
 
             // Only set if not already provided explicitly
             if (empty($model->{$col})) {
-                $model->{$col} = tenant()->getTenantKey();
+                $tenantKey = $tenant->getTenantKey();
+                if (is_string($tenantKey) || is_numeric($tenantKey)) {
+                    $model->{$col} = (string) $tenantKey;
+                }
             }
         });
     }

@@ -4,6 +4,23 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-09-08
+
+### Added
+- **High-Performance Redis Owner Indexing (`sAdd` / `sMembers`)**: Refactored `put()` and `forgetOwner()` in `KeystoneKeyCacheRepository` to utilize Redis sets (`sAdd`, `sMembers`, `del`) for atomic owner key tracking, eliminating get-decode-encode-put race conditions and lock contention under high concurrency.
+- **Bulk Cache Eviction (`forgetMany`)**: Added `forgetMany(array $clients)` method to `KeystoneKeyCacheRepository` and refactored `PruneKeystonesCommand` to evict cached keys in bulk per chunk rather than issuing sequential single-key delete commands.
+- **Multi-Tenant Rate Limiting Key Isolation**: Updated rate limiter key generation in `AuthenticateWithKeystone` to incorporate tenant namespace segments (`keystone:rate_limit:{tenant}:{client}`), preventing key collisions across multi-database tenants.
+- **Cache Driver Agnosticism**: Expanded documentation and type definitions to officially support all native Laravel cache drivers (array, database, file, memcached, redis, dynamodb, octane, null). Replaced isolated 'Redis' terminology with general 'Cache' terminology throughout the core and test suites.
+- **Comprehensive Cache Testing Suite**: Implemented extensive Pest coverage for all cache configuration permutations (`enabled`, `store`, `ttl`, `warm_on_miss`, `refresh_on_use`, and `tenancy.mode`).
+- **Redis Client Compatibility Tests**: Added parameterized tests validating successful cache repository resolution and execution using both `phpredis` PECL extension and the `predis/predis` package.
+- **`revoked_at` Migration Indexes**: Added database indexes on `revoked_at` in base and `single_db` migration stubs to prevent full table scans during key pruning commands.
+- **Strict PHPStan Level Max & Octane Compatibility Config**: Enhanced `phpstan.neon` with `level: max`, `checkOctaneCompatibility: true`, `checkModelProperties: true`, `checkMissingVarTagTypehint: true`, and `checkUninitializedProperties: true`.
+
+### Removed
+- **`last_used_at` & `last_used_ip` DB Tracking**: Completely removed `last_used_at` and `last_used_ip` columns, model properties, docblocks, `$casts`, and `markUsed()` method to eliminate database `UPDATE` query overhead on every authenticated request.
+
+---
+
 ## [2.1.3] — 2026-09-08
 
 ### Fixed
@@ -249,6 +266,7 @@ Features under consideration for future releases:
 
 ---
 
+[2.2.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.2.0
 [2.1.3]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.3
 [2.1.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.2
 [2.1.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.1
@@ -258,4 +276,4 @@ Features under consideration for future releases:
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.1.3...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.2.0...HEAD

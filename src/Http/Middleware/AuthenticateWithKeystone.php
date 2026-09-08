@@ -7,10 +7,10 @@ namespace Schtzie\Keystone\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
 use Schtzie\Keystone\Models\Keystone;
 use Schtzie\Keystone\Services\KeystoneService;
-use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -32,18 +32,25 @@ use Symfony\Component\HttpFoundation\Response;
  *   5. Bind keystoneable owner into IoC + request attributes
  *   6. Optionally log in via auth guard
  *
- * Usage tracking (markUsed + cache re-warm) runs in terminate() after the
- * response is already sent, adding zero latency to API responses.
+ * Cache re-warming runs in terminate() after the response is sent, adding zero latency.
  */
 final class AuthenticateWithKeystone
 {
+    /**
+     * @param KeystoneService $service
+     * @param KeystoneKeyCacheRepository $cache
+     */
     public function __construct(
         private readonly KeystoneService $service,
         private readonly KeystoneKeyCacheRepository $cache,
     ) {}
 
     /**
-     * @param  string  ...$scopes  Optional required scopes passed as middleware parameters
+     * Handle an incoming request.
+     * 
+     * @param Closure(Request): Response $next
+     * @param string ...$scopes Optional required scopes passed as middleware parameters
+     * @return Response
      */
     public function handle(Request $request, Closure $next, string ...$scopes): Response
     {
@@ -54,7 +61,7 @@ final class AuthenticateWithKeystone
         }
 
         $ip = $request->ip();
-        if (!is_null($ip)) {
+        if (! is_null($ip)) {
             $allowlist = $client->ip_allowlist ?? [];
             if ($allowlist !== [] && ! IpUtils::checkIp($ip, $allowlist)) {
                 return response()->json(['message' => 'IP address not allowed.'], 403);
@@ -71,15 +78,17 @@ final class AuthenticateWithKeystone
 
         if (is_numeric($rateLimit) && (int) $rateLimit > 0) {
             $rateLimit = (int) $rateLimit;
-            $limitKey = 'keystone:rate_limit:'.$client->id;
+            $tenantSegment = $this->cache->tenantSegment();
+            $limitKey = 'keystone:rate_limit:'.$tenantSegment.$client->id;
 
             if (RateLimiter::tooManyAttempts($limitKey, $rateLimit)) {
                 $retryAfter = RateLimiter::availableIn($limitKey);
+
                 return response()->json(['message' => 'Too many requests.'], 429, [
-                    'Retry-After' => $retryAfter,
-                    'X-Keystone-RateLimit-Limit' => $rateLimit,
-                    'X-Keystone-RateLimit-Remaining' => 0,
-                    'X-Keystone-RateLimit-Reset' => time() + $retryAfter,
+                    'Retry-After' => (string) $retryAfter,
+                    'X-Keystone-RateLimit-Limit' => (string) $rateLimit,
+                    'X-Keystone-RateLimit-Remaining' => '0',
+                    'X-Keystone-RateLimit-Reset' => (string) (time() + $retryAfter),
                 ]);
             }
 
@@ -108,15 +117,19 @@ final class AuthenticateWithKeystone
         $request->attributes->set('keystoneable', $owner);
 
         // Optional auth guard login (supports string, array, or comma-separated guards)
-        $guards = config('keystone.guard');
+        $guardsConfig = config('keystone.guard');
 
-        if ($guards !== null && $owner instanceof \Illuminate\Contracts\Auth\Authenticatable) {
-            $guards = is_array($guards) ? $guards : explode(',', (string) $guards);
+        if ($guardsConfig !== null && $owner instanceof \Illuminate\Contracts\Auth\Authenticatable) {
+            $guards = is_array($guardsConfig)
+                ? $guardsConfig
+                : (is_string($guardsConfig) ? explode(',', $guardsConfig) : []);
 
             foreach ($guards as $guard) {
-                $guard = trim((string) $guard);
-                if ($guard !== '') {
-                    Auth::guard($guard)->setUser($owner);
+                if (is_string($guard) || is_numeric($guard)) {
+                    $guardStr = trim((string) $guard);
+                    if ($guardStr !== '') {
+                        Auth::guard($guardStr)->setUser($owner);
+                    }
                 }
             }
         }
@@ -124,9 +137,10 @@ final class AuthenticateWithKeystone
         // Stash the resolved key for use in terminate()
         $request->attributes->set('_keystone_client', $client);
 
+        /** @var Response $response */
         $response = $next($request);
 
-        if (!is_null($limitKey)) {
+        if (! is_null($limitKey)) {
             $response->headers->set('X-Keystone-RateLimit-Limit', (string) $rateLimit);
             $response->headers->set('X-Keystone-RateLimit-Remaining', (string) RateLimiter::retriesLeft($limitKey, $rateLimit));
         }
@@ -136,7 +150,11 @@ final class AuthenticateWithKeystone
 
     /**
      * Runs after the response is sent.
-     * Writes usage metadata to the DB and re-warms the Redis entry.
+     * Optionally re-warms the Redis entry.
+     *
+     * @param Request $request
+     * @param Response $response
+     * @return void
      */
     public function terminate(Request $request, Response $response): void
     {
@@ -145,8 +163,6 @@ final class AuthenticateWithKeystone
         if (! $client instanceof Keystone) {
             return;
         }
-
-        $client->markUsed($request);
 
         if (config('keystone.cache.refresh_on_use', true)) {
             $this->cache->put($client);

@@ -62,9 +62,9 @@ it('KeystoneBootstrapper::revert flushes the resolved in-memory state', function
     expect($reflection->getValue($service))->toBeEmpty();
 });
 
-// ── Tenant-Scoped Redis Namespace ──────────────────────────────────────────
+// ── Tenant-Scoped Cache Namespace ──────────────────────────────────────────
 
-it('Redis keys are namespaced by tenant ID in multi_db mode', function (): void {
+it('cache keys are namespaced by tenant ID in multi_db mode', function (): void {
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'Multi DB User']);
     $result = $user->createKeystone('Key A');

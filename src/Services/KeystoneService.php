@@ -42,14 +42,23 @@ final class KeystoneService
      */
     public function resolve(Request $request): ?Keystone
     {
-        $rawKey = $request->header(config('keystone.header', 'X-Client-Id'))
-               ?? $request->query(config('keystone.query_param', 'client'));
+        $headerNameConfig = config('keystone.header', 'X-Client-Id');
+        $headerName = is_string($headerNameConfig) ? $headerNameConfig : 'X-Client-Id';
+        $rawKey = $request->header($headerName);
+
+        if (! is_string($rawKey) || $rawKey === '') {
+            $queryNameConfig = config('keystone.query_param', 'client');
+            $queryName = is_string($queryNameConfig) ? $queryNameConfig : 'client';
+            $rawKey = $request->query($queryName);
+        }
 
         if (! is_string($rawKey) || $rawKey === '') {
             return null;
         }
 
-        $signature = $request->header(config('keystone.signature_header', 'X-API-Signature'));
+        $sigHeaderConfig = config('keystone.signature_header', 'X-API-Signature');
+        $sigHeader = is_string($sigHeaderConfig) ? $sigHeaderConfig : 'X-API-Signature';
+        $signature = $request->header($sigHeader);
 
         if (! is_string($signature) || $signature === '') {
             return null;
@@ -85,7 +94,9 @@ final class KeystoneService
 
         // Database fallback
         if ($client === null) {
-            $client = Keystone::where('client', $rawKey)->first();
+            /** @var class-string<Keystone> $modelClass */
+            $modelClass = config('keystone.model', Keystone::class);
+            $client = $modelClass::where('client', $rawKey)->first();
 
             if ($client !== null && config('keystone.cache.warm_on_miss', true)) {
                 $this->cache->put($client);
@@ -98,13 +109,13 @@ final class KeystoneService
     /**
      * Convenience wrapper — delegates to the owner model's createKeystone().
      *
-     * @param  array{scopes?: array<int,string>, expires_at?: \Carbon\CarbonImmutable|null}  $options
+     * @param  array{scopes?: array<int, string>, expires_at?: \Carbon\CarbonImmutable|null}  $options
      * @return array{client: string, secret: string, model: Keystone}
      */
     public function generate(Model $owner, string $name, array $options = []): array
     {
-        /** @phpstan-ignore method.notFound */
-        return $owner->createKeystone(
+        /** @var array{client: string, secret: string, model: Keystone} */
+        return $owner->createKeystone( // @phpstan-ignore-line
             $name,
             $options['scopes'] ?? [],
             $options['expires_at'] ?? null,
@@ -112,7 +123,7 @@ final class KeystoneService
     }
 
     /**
-     * Force-evict an client from both the in-memory map and Redis.
+     * Force-evict a client from both the in-memory map and Redis.
      */
     public function invalidate(string $client): void
     {

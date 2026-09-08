@@ -37,12 +37,8 @@ return new class extends Migration
             $table->integer('rate_limit')->nullable();
             $table->timestamp('expires_at')->nullable();
 
-            // Usage tracking — written asynchronously in middleware terminate()
-            $table->timestamp('last_used_at')->nullable();
-            $table->string('last_used_ip', 45)->nullable(); // IPv6 max = 45 chars
-
             // Soft-revocation — non-null means the key is rejected
-            $table->timestamp('revoked_at')->nullable();
+            $table->timestamp('revoked_at')->nullable()->index('keystoneables_revoked_at_index');
 
             $table->timestamps();
 

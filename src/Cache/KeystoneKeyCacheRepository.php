@@ -8,13 +8,13 @@ use Illuminate\Contracts\Cache\Repository;
 use Schtzie\Keystone\Models\Keystone;
 
 /**
- * Single source of truth for all Keystone Redis interactions.
+ * Single source of truth for all Keystone Cache interactions.
  *
- * Tenant-namespace-aware: prefixes every Redis key with the current tenant's
+ * Tenant-namespace-aware: prefixes every cache key with the current tenant's
  * ID when a tenancy mode other than 'none' is active, keeping tenant data
- * strictly separated within a shared Redis instance.
+ * strictly separated within a shared cache instance.
  *
- * Redis key layout:
+ * Cache key layout:
  *   {prefix}:{tenantSegment}key:{client}
  *   {prefix}:{tenantSegment}owner:{type}:{id}   → JSON array of client strings
  *
@@ -53,17 +53,21 @@ final class KeystoneKeyCacheRepository
             return null;
         }
 
+        /** @var array<string, mixed>|null $attributes */
         $attributes = json_decode($data, true);
 
         if (! is_array($attributes)) {
             return null;
         }
 
-        return (new Keystone())->newFromBuilder($attributes);
+        /** @var class-string<Keystone> $modelClass */
+        $modelClass = config('keystone.model', Keystone::class);
+
+        return (new $modelClass())->newFromBuilder($attributes);
     }
 
     /**
-     * Write an Keystone into the cache and track it in the owner index.
+     * Write a Keystone into the cache and track it in the owner index.
      */
     public function put(Keystone $client): void
     {
@@ -79,17 +83,7 @@ final class KeystoneKeyCacheRepository
 
         $this->cache->put($keyEntry, $payload, $this->ttl);
 
-        // Maintain an owner-keyed index so bulk invalidation is possible
-        /** @var string $existingJson */
-        $existingJson = $this->cache->get($ownerEntry, '[]');
-        /** @var array<int, string> $set */
-        $set = json_decode($existingJson, true);
-
-        if (! in_array($client->client, $set, true)) {
-            $set[] = $client->client;
-        }
-
-        $this->cache->put($ownerEntry, json_encode(array_values($set)), $this->ttl);
+        $this->addClientToOwnerIndex($ownerEntry, $client->client);
     }
 
     /**
@@ -101,22 +95,61 @@ final class KeystoneKeyCacheRepository
     }
 
     /**
+     * Evict multiple client entries from the cache in a single operation.
+     *
+     * @param  array<int, string>  $clients
+     */
+    public function forgetMany(array $clients): void
+    {
+        if ($clients === []) {
+            return;
+        }
+
+        if (method_exists($this->cache, 'forgetMany')) {
+            $keys = array_map(fn (string $client): string => $this->keyFor($client), $clients);
+            $this->cache->forgetMany($keys);
+
+            return;
+        }
+
+        foreach ($clients as $client) {
+            $this->forget($client);
+        }
+    }
+
+    /**
      * Evict all cached keys belonging to a specific owner (e.g. on revokeAll).
      */
     public function forgetOwner(string $type, int|string $id): void
     {
         $ownerEntry = $this->ownerKeyFor($type, $id);
+        $store = $this->cache instanceof \Illuminate\Cache\Repository ? $this->cache->getStore() : null;
 
-        /** @var string $json */
-        $json = $this->cache->get($ownerEntry, '[]');
-        /** @var array<int, string> $keys */
-        $keys = json_decode($json, true);
+        $keys = [];
 
-        foreach ($keys as $client) {
-            $this->cache->forget($this->keyFor($client));
+        if ($store instanceof \Illuminate\Cache\RedisStore) {
+            /** @var \Illuminate\Redis\Connections\Connection $connection */
+            $connection = $store->connection();
+            /** @var array<int, mixed> $members */
+            $members = (array) $connection->sMembers($ownerEntry);
+            $keys = array_values(array_filter($members, 'is_string'));
+            $connection->del($ownerEntry);
+        } else {
+            /** @var string $json */
+            $json = $this->cache->get($ownerEntry, '[]');
+            /** @var mixed $decoded */
+            $decoded = json_decode($json, true);
+
+            if (is_array($decoded)) {
+                $keys = array_values(array_filter($decoded, 'is_string'));
+            }
+
+            $this->cache->forget($ownerEntry);
         }
 
-        $this->cache->forget($ownerEntry);
+        if ($keys !== []) {
+            $this->forgetMany($keys);
+        }
     }
 
     /**
@@ -127,17 +160,21 @@ final class KeystoneKeyCacheRepository
     {
         // When using an array store (tests) or a store without tag support,
         // we do a best-effort forget using the known prefix. For production
-        // Redis, callers should prefer per-key or per-owner invalidation.
-        $this->cache->flush();
+        // usage, callers should prefer per-key or per-owner invalidation.
+        if ($this->cache instanceof \Illuminate\Cache\Repository) {
+            $this->cache->getStore()->flush();
+        } elseif (method_exists($this->cache, 'flush')) {
+            /** @var callable $flusher */
+            $flusher = [$this->cache, 'flush'];
+            $flusher();
+        }
     }
 
-    // ── Namespace helpers ──────────────────────────────────────────────────
-
     /**
-     * Returns a tenant-specific segment for Redis key construction.
+     * Returns a tenant-specific segment for Cache key construction.
      * Empty string when tenancy is disabled or not yet initialised.
      */
-    private function tenantSegment(): string
+    public function tenantSegment(): string
     {
         $mode = config('keystone.tenancy.mode', 'none');
 
@@ -145,20 +182,85 @@ final class KeystoneKeyCacheRepository
             return '';
         }
 
-        if (! function_exists('tenant') || tenant() === null) {
+        if (! function_exists('tenant')) {
             return '';
         }
 
-        return (string) tenant()->getTenantKey().':';
+        /** @var mixed $tenant */
+        $tenant = tenant();
+
+        if (! is_object($tenant) || ! method_exists($tenant, 'getTenantKey')) {
+            return '';
+        }
+
+        $tenantKey = $tenant->getTenantKey();
+
+        if (! is_string($tenantKey) && ! is_numeric($tenantKey)) {
+            return '';
+        }
+
+        return (string) $tenantKey.':';
     }
 
+    /**
+     * Adds a client identifier to the owner index set.
+     */
+    private function addClientToOwnerIndex(string $ownerEntry, string $client): void
+    {
+        $store = $this->cache instanceof \Illuminate\Cache\Repository ? $this->cache->getStore() : null;
+
+        if ($store instanceof \Illuminate\Cache\RedisStore) {
+            /** @var \Illuminate\Redis\Connections\Connection $connection */
+            $connection = $store->connection();
+            $connection->sAdd($ownerEntry, $client);
+
+            if ($this->ttl !== null) {
+                $connection->expire($ownerEntry, $this->ttl);
+            }
+
+            return;
+        }
+
+        // Fallback for non-Redis cache stores
+        /** @var string $existingJson */
+        $existingJson = $this->cache->get($ownerEntry, '[]');
+        /** @var mixed $set */
+        $set = json_decode($existingJson, true);
+
+        if (! is_array($set)) {
+            $set = [];
+        }
+
+        if (! in_array($client, $set, true)) {
+            $set[] = $client;
+            $this->cache->put($ownerEntry, json_encode(array_values($set)), $this->ttl);
+        }
+    }
+
+    /**
+     * Construct the fully namespaced Cache key for an individual client.
+     *
+     * Format: {prefix}:{tenant_id}:key:{client} (or {prefix}:key:{client} when tenancy is disabled).
+     *
+     * @param  string  $client  The plain client identifier.
+     * @return string The formatted cache key string.
+     */
     private function keyFor(string $client): string
     {
-        return $this->prefix.':'.$this->tenantSegment().'key:'.$client;
+        return "{$this->prefix}:{$this->tenantSegment()}key:{$client}";
     }
 
+    /**
+     * Construct the fully namespaced Cache key for an owner's key index.
+     *
+     * Used for bulk cache invalidation when revoking all keys belonging to an owner.
+     *
+     * @param  string  $type  The polymorphic model class name (e.g. App\Models\User).
+     * @param  int|string  $id  The polymorphic model primary key.
+     * @return string The formatted owner index key string.
+     */
     private function ownerKeyFor(string $type, int|string $id): string
     {
-        return $this->prefix.':'.$this->tenantSegment().'owner:'.$type.':'.$id;
+        return "{$this->prefix}:{$this->tenantSegment()}owner:{$type}:{$id}";
     }
 }

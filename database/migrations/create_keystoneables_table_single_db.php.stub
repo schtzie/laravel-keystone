@@ -44,10 +44,6 @@ return new class extends Migration
             $table->integer('rate_limit')->nullable();
             $table->timestamp('expires_at')->nullable();
 
-            // Usage tracking — written asynchronously in middleware terminate()
-            $table->timestamp('last_used_at')->nullable();
-            $table->string('last_used_ip', 45)->nullable();
-
             // Soft-revocation — non-null means the key is rejected
             $table->timestamp('revoked_at')->nullable();
 
@@ -58,6 +54,7 @@ return new class extends Migration
             // Composite index optimises the most common query:
             // WHERE tenant_id = ? AND client = ?
             $table->index([$tenantCol, 'client'], 'keystoneables_tenant_key_index');
+            $table->index([$tenantCol, 'revoked_at'], 'keystoneables_tenant_revoked_at_index');
         });
     }
 

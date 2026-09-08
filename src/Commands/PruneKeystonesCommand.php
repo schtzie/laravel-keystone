@@ -18,26 +18,44 @@ use Schtzie\Keystone\Models\Keystone;
  */
 final class PruneKeystonesCommand extends Command
 {
+    /** @var string */
     protected $signature = 'keystone:prune
         {--days= : Override the prune_revoked_after_days config value}';
 
+    /** @var string */
     protected $description = 'Delete revoked Clients older than the configured retention period and evict their cache entries.';
 
+    /**
+     * Execute the console command.
+     *
+     * @param KeystoneKeyCacheRepository $cache
+     * @return int
+     */
     public function handle(KeystoneKeyCacheRepository $cache): int
     {
-        $days = (int) ($this->option('days') ?? config('keystone.prune_revoked_after_days', 30));
+        $daysOption = $this->option('days');
+        $configDays = config('keystone.prune_revoked_after_days', 30);
+        $days = (int) (is_numeric($daysOption) ? $daysOption : (is_numeric($configDays) ? $configDays : 30));
 
         $cutoff = now()->subDays($days);
 
         $pruned = 0;
 
-        Keystone::whereNotNull('revoked_at')
+        /** @var class-string<Keystone> $modelClass */
+        $modelClass = config('keystone.model', Keystone::class);
+
+        $modelClass::whereNotNull('revoked_at')
             ->where('revoked_at', '<', $cutoff)
-            ->chunkById(200, function ($keys) use ($cache, &$pruned): void {
-                foreach ($keys as $key) {
-                    $cache->forget($key->client);
-                    $key->deleteQuietly();
-                    $pruned++;
+            ->chunkById(500, function ($keys) use ($cache, $modelClass, &$pruned): void {
+                /** @var array<int, string> $clients */
+                $clients = array_values(array_filter($keys->pluck('client')->all(), 'is_string'));
+                $cache->forgetMany($clients);
+
+                $ids = $keys->pluck('id')->all();
+
+                if ($ids !== []) {
+                    $modelClass::whereIn('id', $ids)->delete();
+                    $pruned += count($ids);
                 }
             });
 
