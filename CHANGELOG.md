@@ -4,10 +4,17 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] — 2026-09-08
+
+### Fixed
+- **Tenancy Bootstrapper Registration — `getBootstrappersUsing` Closure**: Replaced the intermediate `getBootstrappers()` / `setBootstrappers()` approach (v2.1.1) with stancl/tenancy v4's public `getBootstrappersUsing` callable property in `KeystoneServiceProvider::registerTenancyBootstrapper()`. The new implementation wraps any previously registered callable, falls back to `config('tenancy.bootstrappers')`, and appends `KeystoneBootstrapper` — making it fully composable with other packages that also register bootstrappers via the same hook.
+
+---
+
 ## [2.1.1] — 2026-09-08
 
 ### Fixed
-- **Tenancy Bootstrapper Registration**: Replaced direct property access (`$tenancy->bootstrappers`) with the public getter/setter API (`getBootstrappers()` / `setBootstrappers()`) in `KeystoneServiceProvider::registerTenancyBootstrapper()`. The direct property access caused an `undefined property` error on `stancl/tenancy` v4 instances where `bootstrappers` is not a public property.
+- **Tenancy Bootstrapper Registration**: Replaced direct array property access (`$tenancy->bootstrappers`) with `getBootstrappers()` / `setBootstrappers()` in `KeystoneServiceProvider::registerTenancyBootstrapper()`. The direct property access caused an `undefined property` error on `stancl/tenancy` v4 instances where `bootstrappers` is not a public property.
 
 ---
 
@@ -234,12 +241,12 @@ Features under consideration for future releases:
 
 ---
 
+[2.1.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.2
 [2.1.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.1
 [2.1.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.0
-[2.0.4]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.4
 [2.0.3]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.3
 [2.0.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.2
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.1.2...HEAD

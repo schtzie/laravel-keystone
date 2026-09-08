@@ -127,11 +127,19 @@ final class KeystoneServiceProvider extends ServiceProvider
         }
 
         $this->app->resolving(\Stancl\Tenancy\Tenancy::class, function ($tenancy): void {
-            $bootstrappers = $tenancy->getBootstrappers();
-            if (! in_array(KeystoneBootstrapper::class, $bootstrappers, true)) {
-                $bootstrappers[] = KeystoneBootstrapper::class;
-                $tenancy->setBootstrappers($bootstrappers);
-            }
+            $previous = $tenancy->getBootstrappersUsing;
+
+            $tenancy->getBootstrappersUsing = function ($tenant) use ($previous): array {
+                $bootstrappers = $previous
+                    ? $previous($tenant)
+                    : (array) config('tenancy.bootstrappers', []);
+
+                if (! in_array(KeystoneBootstrapper::class, $bootstrappers, true)) {
+                    $bootstrappers[] = KeystoneBootstrapper::class;
+                }
+
+                return $bootstrappers;
+            };
         });
     }
 }
