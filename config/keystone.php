@@ -131,17 +131,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Redis Cache Settings
+    | Cache Settings
     |--------------------------------------------------------------------------
     |
-    | Configure Redis caching options to minimize database lookup overhead:
+    | Configure caching options to minimize database lookup overhead.
+    | Keystone supports all Laravel cache drivers out of the box.
+    |
+    | Supported drivers: "array", "database", "file", "memcached",
+    | "redis", "dynamodb", "octane", "null"
+    |
+    | Note: If using the "redis" driver, you must either install the
+    | PhpRedis PHP extension via PECL or install the predis/predis package.
     |
     | - enabled: Master toggle. Set to false to bypass cache and query DB.
-    | - store: Cache store name defined in cache config (must be Redis-backed).
+    | - store: Cache store name defined in cache config.
     | - ttl: Time-to-live for cached credentials in seconds (null = no expiry).
-    | - prefix: Namespace prefix prepended to all Redis cache keys.
+    | - prefix: Namespace prefix prepended to all cache keys.
     | - warm_on_miss: Automatically cache records retrieved during a DB miss.
-    | - refresh_on_use: Re-warm Redis entry in middleware terminate() post-auth.
+    | - refresh_on_use: Re-warm cache entry in middleware terminate() post-auth.
     |
     */
 

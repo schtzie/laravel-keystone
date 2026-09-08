@@ -67,7 +67,7 @@ it('does not return keys from another tenant', function (): void {
     expect($userA->keystones()->count())->toBe(0);
 });
 
-it('namespaces Redis cache keys by tenant_id in single_db mode', function (): void {
+it('namespaces cache keys by tenant_id in single_db mode', function (): void {
     FakeTenant::set('tenant-a');
     $user = User::create(['name' => 'Cache Tenant A']);
     $result = $user->createKeystone('Key A');

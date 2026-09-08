@@ -25,7 +25,7 @@
   - [Middleware](#middleware)
   - [Scope Enforcement](#scope-enforcement)
   - [Accessing the Authenticated Owner](#accessing-the-authenticated-owner)
-- [Redis Caching](#redis-caching)
+- [Caching](#caching)
   - [How It Works](#how-it-works)
   - [Cache Configuration](#cache-configuration)
   - [Manual Invalidation](#manual-invalidation)
@@ -52,7 +52,7 @@ Laravel Keystone lets any Eloquent model (User, Team, Application, etc.) own one
 2. Verifying an **HMAC-SHA256 signature** (signed with the secret key)
 3. Optionally enforcing **scopes** on the resolved key
 
-Authorized keys are stored in **Redis** to eliminate database round-trips on hot paths. The package integrates transparently with **stancl/tenancy v4** for both single-database and multi-database multi-tenant setups.
+Authorized keys are cached (e.g. in **Redis**) to eliminate database round-trips on hot paths. The package integrates transparently with **stancl/tenancy v4** for both single-database and multi-database multi-tenant setups.
 
 ---
 
@@ -64,6 +64,8 @@ Authorized keys are stored in **Redis** to eliminate database round-trips on hot
 | Laravel | `11.x`, `12.x`, or `13.x` |
 | Redis (recommended) | Any version supported by `illuminate/redis` |
 | stancl/tenancy (optional) | `^4.0` |
+
+> **Note:** If you are using the `redis` cache driver, you must either install the **PhpRedis** PHP extension via PECL or install the **predis/predis** package (`composer require predis/predis`).
 
 ---
 
@@ -132,8 +134,8 @@ return [
         'store'          => env('KEYSTONE_CACHE_STORE', 'redis'),
         'ttl'            => 3600,   // seconds (null = no expiry)
         'prefix'         => 'keystone',
-        'warm_on_miss'   => true,   // populate Redis on DB hit
-        'refresh_on_use' => true,   // re-warm Redis after each auth
+        'warm_on_miss'   => true,   // populate cache on DB hit
+        'refresh_on_use' => true,   // re-warm cache after each auth
     ],
 
     'tenancy' => [
@@ -396,7 +398,7 @@ public function show(Request $request): JsonResponse
 
 ---
 
-## Redis Caching
+## Caching
 
 ### How It Works
 
@@ -410,22 +412,22 @@ The resolution pipeline on every authenticated request:
 3. In-memory map (per-request, cleared on tenant switch)
         │ miss
         ▼
-4. Redis lookup  ─── hit ──► verify HMAC → authorize
+4. Cache lookup   ─── hit ──► verify HMAC → authorize
         │ miss
         ▼
 5. Database query
         │ found
         ▼
-6. Write to Redis (warm_on_miss=true)
+6. Write to Cache (warm_on_miss=true)
         │
         ▼
 7. Verify HMAC → authorize
         │
         ▼
-8. terminate(): write last_used_at + IP to DB, re-warm Redis
+8. terminate(): re-warm Cache entry (zero-database-write architecture)
 ```
 
-The `markUsed()` database write happens in `terminate()` — **after** the response is already sent to the client, so it adds zero latency to API responses.
+Key lookups are cached (using your configured Laravel cache store) to achieve zero-database-per-request throughput. Optional cache re-warming happens in `terminate()` — **after** the response is already sent to the client, adding zero latency to API responses.
 
 ---
 
@@ -437,18 +439,18 @@ The `markUsed()` database write happens in `terminate()` — **after** the respo
     'enabled'        => true,           // false = always hit the DB
     'store'          => 'redis',        // any Laravel cache store
     'ttl'            => 3600,           // entry lifetime in seconds
-    'warm_on_miss'   => true,           // write to Redis on DB hit
+    'warm_on_miss'   => true,           // write to cache on DB hit
     'refresh_on_use' => true,           // re-warm after each successful auth
 ],
 ```
 
-**Redis key format (no tenancy):**
+**Cache key format (no tenancy):**
 ```
 keystone:key:{client}
 keystone:owner:{ModelClass}:{id}
 ```
 
-**Redis key format (with tenancy):**
+**Cache key format (with tenancy):**
 ```
 keystone:{tenant_id}:key:{client}
 keystone:{tenant_id}:owner:{ModelClass}:{id}
@@ -505,7 +507,7 @@ $old = $user->keystones()->first();
 
 $new = $user->rotateKeystone($old);
 
-// Old key is revoked, evicted from Redis
+// Old key is revoked, evicted from cache
 // New key is returned with fresh client + secret
 echo $new['client'];
 echo $new['secret'];
@@ -594,7 +596,7 @@ $result = $team->createKeystone('Team Key');
 | Layer | Mechanism |
 |---|---|
 | Database | `TenantScope` global scope → `WHERE tenant_id = ?` on all Keystone queries |
-| Redis | Cache keys are namespaced as `keystone:{tenant_id}:key:...` |
+| Cache | Cache keys are namespaced as `keystone:{tenant_id}:key:...` |
 | In-memory | `KeystoneBootstrapper::bootstrap()` clears the in-memory resolved map on tenant switch |
 
 ---
@@ -629,7 +631,7 @@ Route::middleware([
 | Layer | Mechanism |
 |---|---|
 | Database | stancl switches the Eloquent DB connection before your routes run |
-| Redis | stancl's `RedisTenancyBootstrapper` switches the Redis connection prefix; Keystone adds `keystone:{tenant_id}:` on top |
+| Cache | stancl's `RedisTenancyBootstrapper` (if using Redis) or cache manager handles prefixing; Keystone adds `keystone:{tenant_id}:` on top |
 | In-memory | `KeystoneBootstrapper` flushes the resolved map on every tenant switch (critical for Octane / queue workers) |
 
 ---
@@ -675,7 +677,7 @@ $result = Keystone::generate($user, 'My Key', [
     'expires_at' => now()->addYear()->toImmutable(),
 ]);
 
-// Evict from both in-memory map and Redis
+// Evict from both in-memory map and cache
 Keystone::invalidate('ks_abc...');
 
 // Clear the in-memory resolved map (called automatically on tenant switch)
@@ -695,12 +697,12 @@ Keystone::flushResolved();
 
 ## Events & Observers
 
-Keystone hooks into Eloquent model events to keep Redis in sync automatically:
+Keystone hooks into Eloquent model events to keep the cache in sync automatically:
 
 | Event | Action |
 |---|---|
-| `Keystone::updated` | Evicts the key from Redis (fires on `revoke()`) |
-| `Keystone::deleted` | Evicts the key from Redis (fires on hard-delete / pruning) |
+| `Keystone::updated` | Evicts the key from cache (fires on `revoke()`) |
+| `Keystone::deleted` | Evicts the key from cache (fires on hard-delete / pruning) |
 
 These are registered in `KeystoneServiceProvider::boot()` without requiring you to publish or configure anything.
 
