@@ -49,10 +49,8 @@ trait HasKeystones
     /**
      * Generate and persist a new Client pair for this model.
      *
-     * @param string $name
-     * @param array<int, string> $scopes
-     * @param CarbonImmutable|null $expiresAt
-     * @param array<string, mixed> $options
+     * @param  array<int, string>  $scopes
+     * @param  array<string, mixed>  $options
      * @return array{client: string, secret: string, model: Keystone}
      */
     public function createKeystone(
@@ -91,9 +89,6 @@ trait HasKeystones
 
     /**
      * Revoke a specific Client by its ID or model instance.
-     *
-     * @param int|string|Keystone $key
-     * @return bool
      */
     public function revokeKeystone(int|string|Keystone $key): bool
     {
@@ -107,8 +102,6 @@ trait HasKeystones
     /**
      * Revoke all active Clients for this model.
      * Also purges the owner's Redis index.
-     *
-     * @return int
      */
     public function revokeAllKeystones(): int
     {
@@ -126,7 +119,6 @@ trait HasKeystones
     /**
      * Revoke an existing key and create a new one atomically.
      *
-     * @param int|string|Keystone $old
      * @return array{client: string, secret: string, model: Keystone}
      */
     public function rotateKeystone(int|string|Keystone $old): array
@@ -153,4 +145,3 @@ trait HasKeystones
         });
     }
 }
-

@@ -23,16 +23,12 @@ use Schtzie\Keystone\Services\KeystoneService;
  */
 final class KeystoneBootstrapper
 {
-    /**
-     * @param KeystoneService $service
-     */
     public function __construct(private readonly KeystoneService $service) {}
 
     /**
      * Called by stancl/tenancy when a new tenant is initialised.
      *
-     * @param object $tenant Stancl\Tenancy\Database\Models\Tenant or custom model
-     * @return void
+     * @param  object  $tenant  Stancl\Tenancy\Database\Models\Tenant or custom model
      */
     public function bootstrap(object $tenant): void
     {
@@ -41,12 +37,9 @@ final class KeystoneBootstrapper
 
     /**
      * Called by stancl/tenancy when tenancy is ended (e.g. back to central context).
-     *
-     * @return void
      */
     public function revert(): void
     {
         $this->service->flushResolved();
     }
 }
-

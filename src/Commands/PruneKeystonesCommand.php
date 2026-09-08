@@ -47,10 +47,9 @@ final class PruneKeystonesCommand extends Command
         $modelClass::whereNotNull('revoked_at')
             ->where('revoked_at', '<', $cutoff)
             ->chunkById(500, function ($keys) use ($cache, $modelClass, &$pruned): void {
-                /** @var Keystone $key */
-                foreach ($keys as $key) {
-                    $cache->forget($key->client);
-                }
+                /** @var array<int, string> $clients */
+                $clients = array_values(array_filter($keys->pluck('client')->all(), 'is_string'));
+                $cache->forgetMany($clients);
 
                 $ids = $keys->pluck('id')->all();
 
@@ -65,4 +64,3 @@ final class PruneKeystonesCommand extends Command
         return self::SUCCESS;
     }
 }
-

@@ -14,18 +14,15 @@ use Schtzie\Keystone\Services\KeystoneService;
  * @method static void invalidate(string $client)
  * @method static void flushResolved()
  *
- * @see \Schtzie\Keystone\Services\KeystoneService
+ * @see KeystoneService
  */
 final class Keystone extends Facade
 {
     /**
      * Get the registered name of the component.
-     *
-     * @return string
      */
     protected static function getFacadeAccessor(): string
     {
         return KeystoneService::class;
     }
 }
-

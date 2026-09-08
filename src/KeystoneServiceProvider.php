@@ -19,8 +19,6 @@ final class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Register services in the container.
-     *
-     * @return void
      */
     public function register(): void
     {
@@ -58,8 +56,6 @@ final class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Bootstrap application services.
-     *
-     * @return void
      */
     public function boot(): void
     {
@@ -74,8 +70,6 @@ final class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Register publishable assets.
-     *
-     * @return void
      */
     private function registerPublishables(): void
     {
@@ -101,8 +95,6 @@ final class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Register route middleware.
-     *
-     * @return void
      */
     private function registerMiddleware(): void
     {
@@ -113,8 +105,6 @@ final class KeystoneServiceProvider extends ServiceProvider
 
     /**
      * Register Artisan commands.
-     *
-     * @return void
      */
     private function registerCommands(): void
     {
@@ -126,8 +116,6 @@ final class KeystoneServiceProvider extends ServiceProvider
     /**
      * Automatically evict Redis cache entries when Keystone records are
      * updated (e.g. revoked) or hard-deleted.
-     *
-     * @return void
      */
     private function registerModelObservers(): void
     {
@@ -154,8 +142,6 @@ final class KeystoneServiceProvider extends ServiceProvider
      * Guards:
      *  - auto_register_bootstrapper config must be true
      *  - stancl/tenancy must be installed (class_exists check)
-     *
-     * @return void
      */
     private function registerTenancyBootstrapper(): void
     {
@@ -168,7 +154,7 @@ final class KeystoneServiceProvider extends ServiceProvider
         }
 
         $this->app->resolving(\Stancl\Tenancy\Tenancy::class, function (object $tenancy): void {
-            $previous = $tenancy->getBootstrappersUsing ?? null; // @phpstan-ignore-line
+            $previous = $tenancy->getBootstrappersUsing ?? null;
 
             $tenancy->getBootstrappersUsing = function ($tenant) use ($previous): array { // @phpstan-ignore-line
                 /** @var array<int, string> $bootstrappers */
@@ -185,4 +171,3 @@ final class KeystoneServiceProvider extends ServiceProvider
         });
     }
 }
-

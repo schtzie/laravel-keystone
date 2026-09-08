@@ -4,8 +4,15 @@ includes:
 parameters:
     paths:
         - src
-    level: 7
 
-    reportUnmatchedIgnoredErrors: false
+    level: max
+
+    checkOctaneCompatibility: true
+    checkModelProperties: true
+    checkMissingVarTagTypehint: true
+    checkUninitializedProperties: true
+
+    reportUnmatchedIgnoredErrors: true
+
     ignoreErrors:
         - '#Trait .* is used zero times and is not analysed#'

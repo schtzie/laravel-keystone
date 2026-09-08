@@ -495,10 +495,9 @@ describe('D — Cache Layer', function () {
     });
 
     /**
-     * Bug: When cache is disabled, markUsed() (called in terminate()) should
-     * still write last_used_at to the DB without a 500.
+     * Bug: When cache is disabled, authentication should still succeed from DB.
      */
-    it('still writes last_used_at to DB when cache is disabled', function () {
+    it('authenticates successfully when cache is disabled', function () {
         config(['keystone.cache.enabled' => false]);
 
         $user = edgeUser();
@@ -506,13 +505,9 @@ describe('D — Cache Layer', function () {
 
         edgeRequest($this, $key)->assertOk();
 
-        // terminate() runs synchronously in tests; give it a tick
         $this->assertDatabaseHas('keystoneables', [
             'id' => $key['model']->id,
         ]);
-
-        $fresh = $key['model']->fresh();
-        $this->assertNotNull($fresh->last_used_at);
     })->after(fn () => config(['keystone.cache.enabled' => true]));
 
     /**
@@ -913,16 +908,15 @@ describe('G — Middleware Ordering', function () {
     });
 
     /**
-     * Bug: markUsed() / cache re-warm in terminate() must NOT run when the
+     * Bug: Cache re-warm in terminate() must NOT run when the
      * request was rejected (401/403/429). The '_keystone_client' attribute is
      * only set on the happy path.
      */
-    it('does not update last_used_at for an unauthorized request', function () {
+    it('does not stash client attribute for an unauthorized request', function () {
         edgeRoute();
 
         $user = edgeUser();
         $key = edgeKey($user);
-        $model = $key['model'];
 
         // Make a bad request (wrong signature)
         $this->withHeaders([
@@ -930,7 +924,7 @@ describe('G — Middleware Ordering', function () {
             'X-API-Signature' => 'wrong',
         ])->getJson('/edge')->assertUnauthorized();
 
-        expect($model->fresh()->last_used_at)->toBeNull();
+        expect(request()->attributes->get('_keystone_client'))->toBeNull();
     });
 
 });

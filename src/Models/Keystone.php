@@ -8,7 +8,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Http\Request;
 use Schtzie\Keystone\Tenancy\Concerns\TenantAware;
 
 /**
@@ -24,8 +23,6 @@ use Schtzie\Keystone\Tenancy\Concerns\TenantAware;
  * @property array<int, string>|null $ip_blocklist
  * @property int|null $rate_limit
  * @property CarbonImmutable|null $expires_at
- * @property CarbonImmutable|null $last_used_at
- * @property string|null $last_used_ip
  * @property CarbonImmutable|null $revoked_at
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -47,7 +44,6 @@ class Keystone extends Model
         'ip_blocklist' => 'array',
         'rate_limit' => 'integer',
         'expires_at' => 'immutable_datetime',
-        'last_used_at' => 'immutable_datetime',
         'revoked_at' => 'immutable_datetime',
     ];
 
@@ -80,7 +76,7 @@ class Keystone extends Model
     /**
      * Keys that are neither revoked nor expired.
      *
-     * @param Builder<self> $query
+     * @param  Builder<self>  $query
      * @return Builder<self>
      */
     public function scopeActive(Builder $query): Builder
@@ -93,7 +89,7 @@ class Keystone extends Model
     /**
      * Keys that have not been revoked.
      *
-     * @param Builder<self> $query
+     * @param  Builder<self>  $query
      * @return Builder<self>
      */
     public function scopeNotRevoked(Builder $query): Builder
@@ -104,7 +100,7 @@ class Keystone extends Model
     /**
      * Keys that have not passed their expiry date (or have no expiry).
      *
-     * @param Builder<self> $query
+     * @param  Builder<self>  $query
      * @return Builder<self>
      */
     public function scopeNotExpired(Builder $query): Builder
@@ -153,23 +149,6 @@ class Keystone extends Model
     }
 
     /**
-     * Record usage metadata.
-     * Called from middleware terminate() so it never adds request latency.
-     *
-     * @param Request $request
-     * @return void
-     */
-    public function markUsed(Request $request): void
-    {
-        // updateQuietly suppresses events — we don't want markUsed to
-        // trigger cache invalidation (the entry is still valid).
-        $this->updateQuietly([
-            'last_used_at' => now(),
-            'last_used_ip' => $request->ip(),
-        ]);
-    }
-
-    /**
      * Verify that the given signature matches hash_hmac('sha256', client, secret).
      * Uses hash_equals to prevent timing attacks.
      *
@@ -183,4 +162,3 @@ class Keystone extends Model
         return hash_equals($expected, $signature);
     }
 }
-

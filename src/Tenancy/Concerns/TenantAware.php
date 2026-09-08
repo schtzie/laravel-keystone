@@ -20,8 +20,6 @@ trait TenantAware
 {
     /**
      * Boot the tenant aware trait for a model.
-     *
-     * @return void
      */
     public static function bootTenantAware(): void
     {
@@ -57,4 +55,3 @@ trait TenantAware
         });
     }
 }
-

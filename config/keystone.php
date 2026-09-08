@@ -28,7 +28,7 @@ return [
     |
     */
 
-    'model' => \Schtzie\Keystone\Models\Keystone::class,
+    'model' => Schtzie\Keystone\Models\Keystone::class,
 
     /*
     |--------------------------------------------------------------------------

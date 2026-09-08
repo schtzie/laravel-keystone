@@ -22,9 +22,7 @@ return new class extends Migration
             $table->json('ip_blocklist')->nullable();
             $table->integer('rate_limit')->nullable();
             $table->timestamp('expires_at')->nullable();
-            $table->timestamp('last_used_at')->nullable();
-            $table->string('last_used_ip', 45)->nullable();
-            $table->timestamp('revoked_at')->nullable();
+            $table->timestamp('revoked_at')->nullable()->index('keystoneables_revoked_at_index');
             $table->timestamps();
             $table->index(['keystoneable_type', 'keystoneable_id'], 'keystoneables_keystoneable_index');
         });

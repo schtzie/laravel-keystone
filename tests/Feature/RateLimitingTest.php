@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Schtzie\Keystone\Tests\Fixtures\User;
-use Illuminate\Support\Facades\RateLimiter;
 
 beforeEach(function () {
     Route::middleware('api.key')->get('/protected', fn () => 'ok');
 });
 
-function getProtectedRateLimit(object $testCase, array $key) {
+function getProtectedRateLimit(object $testCase, array $key)
+{
     $client = $key['client'];
     $secret = $key['secret'];
     $signature = hash_hmac('sha256', $client, $secret);
@@ -24,7 +25,7 @@ function getProtectedRateLimit(object $testCase, array $key) {
 it('enforces rate limits per key', function () {
     $user = User::create(['name' => 'Test']);
     $key = $user->createKeystone('Test Key', [], null, ['rate_limit' => 2]);
-    
+
     RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
 
     // Request 1
@@ -54,7 +55,7 @@ it('falls back to global rate limit in config', function () {
     $user = User::create(['name' => 'Test']);
     // Key has NO specific rate limit
     $key = $user->createKeystone('Test Key');
-    
+
     RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
 
     // Request 1

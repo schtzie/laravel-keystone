@@ -44,8 +44,7 @@ final class TenantScope implements Scope
         $tenantKey = $tenant->getTenantKey();
 
         if (is_string($tenantKey) || is_numeric($tenantKey)) {
-            $builder->where($column, (string) $tenantKey);
+            $builder->where($column, (string) $tenantKey); // @phpstan-ignore-line
         }
     }
 }
-

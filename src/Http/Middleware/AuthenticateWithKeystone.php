@@ -32,8 +32,7 @@ use Symfony\Component\HttpFoundation\Response;
  *   5. Bind keystoneable owner into IoC + request attributes
  *   6. Optionally log in via auth guard
  *
- * Usage tracking (markUsed + cache re-warm) runs in terminate() after the
- * response is already sent, adding zero latency to API responses.
+ * Cache re-warming runs in terminate() after the response is sent, adding zero latency.
  */
 final class AuthenticateWithKeystone
 {
@@ -48,8 +47,7 @@ final class AuthenticateWithKeystone
 
     /**
      * Handle an incoming request.
-     *
-     * @param Request $request
+     * 
      * @param Closure(Request): Response $next
      * @param string ...$scopes Optional required scopes passed as middleware parameters
      * @return Response
@@ -80,7 +78,8 @@ final class AuthenticateWithKeystone
 
         if (is_numeric($rateLimit) && (int) $rateLimit > 0) {
             $rateLimit = (int) $rateLimit;
-            $limitKey = 'keystone:rate_limit:'.$client->id;
+            $tenantSegment = $this->cache->tenantSegment();
+            $limitKey = 'keystone:rate_limit:'.$tenantSegment.$client->id;
 
             if (RateLimiter::tooManyAttempts($limitKey, $rateLimit)) {
                 $retryAfter = RateLimiter::availableIn($limitKey);
@@ -151,7 +150,7 @@ final class AuthenticateWithKeystone
 
     /**
      * Runs after the response is sent.
-     * Writes usage metadata to the DB and re-warms the Redis entry.
+     * Optionally re-warms the Redis entry.
      *
      * @param Request $request
      * @param Response $response
@@ -165,11 +164,8 @@ final class AuthenticateWithKeystone
             return;
         }
 
-        $client->markUsed($request);
-
         if (config('keystone.cache.refresh_on_use', true)) {
             $this->cache->put($client);
         }
     }
 }
-

@@ -27,9 +27,6 @@ final class KeystoneService
      */
     private array $resolved = [];
 
-    /**
-     * @param KeystoneKeyCacheRepository $cache
-     */
     public function __construct(private readonly KeystoneKeyCacheRepository $cache) {}
 
     // ── Resolution ─────────────────────────────────────────────────────────
@@ -42,9 +39,6 @@ final class KeystoneService
      *
      * Returns null if the key is missing, invalid, revoked, expired,
      * or the signature does not match.
-     *
-     * @param Request $request
-     * @return Keystone|null
      */
     public function resolve(Request $request): ?Keystone
     {
@@ -88,9 +82,6 @@ final class KeystoneService
      *   1. in-memory ($resolved map)
      *   2. Redis (KeystoneKeyCacheRepository)
      *   3. Database (with optional write-through to Redis)
-     *
-     * @param string $rawKey
-     * @return Keystone|null
      */
     public function findByKeystone(string $rawKey): ?Keystone
     {
@@ -118,9 +109,7 @@ final class KeystoneService
     /**
      * Convenience wrapper — delegates to the owner model's createKeystone().
      *
-     * @param Model $owner
-     * @param string $name
-     * @param array{scopes?: array<int, string>, expires_at?: \Carbon\CarbonImmutable|null} $options
+     * @param  array{scopes?: array<int, string>, expires_at?: \Carbon\CarbonImmutable|null}  $options
      * @return array{client: string, secret: string, model: Keystone}
      */
     public function generate(Model $owner, string $name, array $options = []): array
@@ -135,9 +124,6 @@ final class KeystoneService
 
     /**
      * Force-evict a client from both the in-memory map and Redis.
-     *
-     * @param string $client
-     * @return void
      */
     public function invalidate(string $client): void
     {
@@ -148,12 +134,9 @@ final class KeystoneService
     /**
      * Clear the in-memory resolved map.
      * Called by KeystoneBootstrapper on every tenant switch.
-     *
-     * @return void
      */
     public function flushResolved(): void
     {
         $this->resolved = [];
     }
 }
-
