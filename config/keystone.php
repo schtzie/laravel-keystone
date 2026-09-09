@@ -93,6 +93,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fallback Signature Query Parameter
+    |--------------------------------------------------------------------------
+    |
+    | The HTTP query parameter name checked when the API Signature header is
+    | absent. Useful when you need to authenticate entirely via URL parameters.
+    |
+    */
+
+    'signature_query_param' => 'signature',
+
+    /*
+    |--------------------------------------------------------------------------
     | Authentication Guard(s)
     |--------------------------------------------------------------------------
     |
@@ -153,7 +165,7 @@ return [
     */
 
     'cache' => [
-        'enabled' => true,
+        'enabled' => (bool) env('KEYSTONE_CACHE_ENABLED', true),
         'store' => env('KEYSTONE_CACHE_STORE', 'redis'),
         'ttl' => (int) env('KEYSTONE_CACHE_TTL', 3600),
         'prefix' => 'keystone',

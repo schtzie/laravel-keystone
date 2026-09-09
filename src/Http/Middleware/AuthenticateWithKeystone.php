@@ -128,7 +128,11 @@ final class AuthenticateWithKeystone
                 if (is_string($guard) || is_numeric($guard)) {
                     $guardStr = trim((string) $guard);
                     if ($guardStr !== '') {
-                        Auth::guard($guardStr)->setUser($owner);
+                        try {
+                            Auth::guard($guardStr)->setUser($owner);
+                        } catch (\InvalidArgumentException) {
+                            // Guard does not exist, ignore and continue
+                        }
                     }
                 }
             }

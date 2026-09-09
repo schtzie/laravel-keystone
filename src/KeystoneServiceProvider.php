@@ -15,8 +15,6 @@ use Schtzie\Keystone\Tenancy\KeystoneBootstrapper;
 
 final class KeystoneServiceProvider extends ServiceProvider
 {
-    // ── Registration ───────────────────────────────────────────────────────
-
     /**
      * Register services in the container.
      */
@@ -52,8 +50,6 @@ final class KeystoneServiceProvider extends ServiceProvider
         });
     }
 
-    // ── Boot ───────────────────────────────────────────────────────────────
-
     /**
      * Bootstrap application services.
      */
@@ -65,8 +61,6 @@ final class KeystoneServiceProvider extends ServiceProvider
         $this->registerModelObservers();
         $this->registerTenancyBootstrapper();
     }
-
-    // ── Private Helpers ────────────────────────────────────────────────────
 
     /**
      * Register publishable assets.

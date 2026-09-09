@@ -23,11 +23,37 @@ use Schtzie\Keystone\Models\Keystone;
  *   // $result['secret'] — plain secret for HMAC signing (show once)
  *   // $result['model']      — the persisted Keystone model
  *
+ * Note on Deletion:
+ *   If the owner model is deleted, its keystones are automatically managed:
+ *   - Soft Deletes: Keystones are safely revoked (preserving history) and cache is evicted.
+ *   - Hard Deletes: Keystones are permanently deleted from the database and cache is evicted.
+ *
  * @phpstan-require-extends \Illuminate\Database\Eloquent\Model
  */
 trait HasKeystones
 {
-    // ── Relationship ───────────────────────────────────────────────────────
+    /**
+     * Boot the trait to automatically cascade deletions to keystones.
+     */
+    public static function bootHasKeystones(): void
+    {
+        static::deleting(function (\Illuminate\Database\Eloquent\Model $model) {
+            $isSoftDelete = method_exists($model, 'isForceDeleting') && ! $model->isForceDeleting();
+
+            if ($isSoftDelete) {
+                /** @phpstan-ignore-next-line */
+                $model->revokeAllKeystones();
+            } else {
+                app(KeystoneKeyCacheRepository::class)->forgetOwner(
+                    $model::class,
+                    $model->getKey(),
+                );
+                
+                /** @phpstan-ignore-next-line */
+                $model->keystones()->delete();
+            }
+        });
+    }
 
     /**
      * All Clients belonging to this model.
@@ -43,8 +69,6 @@ trait HasKeystones
 
         return $this->morphMany($modelClass, 'keystoneable');
     }
-
-    // ── Key Management ─────────────────────────────────────────────────────
 
     /**
      * Generate and persist a new Client pair for this model.

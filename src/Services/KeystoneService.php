@@ -29,8 +29,6 @@ final class KeystoneService
 
     public function __construct(private readonly KeystoneKeyCacheRepository $cache) {}
 
-    // ── Resolution ─────────────────────────────────────────────────────────
-
     /**
      * Resolve an Keystone from the incoming request.
      *
@@ -59,6 +57,12 @@ final class KeystoneService
         $sigHeaderConfig = config('keystone.signature_header', 'X-API-Signature');
         $sigHeader = is_string($sigHeaderConfig) ? $sigHeaderConfig : 'X-API-Signature';
         $signature = $request->header($sigHeader);
+
+        if (! is_string($signature) || $signature === '') {
+            $sigQueryConfig = config('keystone.signature_query_param', 'signature');
+            $sigQuery = is_string($sigQueryConfig) ? $sigQueryConfig : 'signature';
+            $signature = $request->query($sigQuery);
+        }
 
         if (! is_string($signature) || $signature === '') {
             return null;
