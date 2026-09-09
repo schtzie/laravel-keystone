@@ -130,3 +130,39 @@ it('flushResolved is called and in-memory state is empty after tenant switch', f
 
     expect($reflection->getValue($service))->toBeEmpty();
 });
+
+it('individual keystone rate limit value takes priority over the global rate limit setting in multi_db mode', function (): void {
+    Route::middleware('api.key')->get('/multi-db-rate-limit', fn () => response()->json(['ok' => true]));
+
+    // Global limit is 1
+    config(['keystone.rate_limit' => 1]);
+
+    FakeTenant::set('tenant-a');
+    $user = User::create(['name' => 'Rate Limit Tenant A']);
+    
+    // Individual limit is 5
+    $result = $user->createKeystone('Key A', [], null, ['rate_limit' => 5]);
+    
+    // Explicitly warm the cache with the model
+    $cache = app(\Schtzie\Keystone\Cache\KeystoneKeyCacheRepository::class);
+    $cache->put($result['model']);
+    
+    // Flush the in-memory map to force the middleware to fetch from the cache
+    app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+
+    $sig = hash_hmac('sha256', $result['client'], $result['secret']);
+    $headers = [
+        'X-Client-Id' => $result['client'],
+        'X-API-Signature' => $sig,
+    ];
+
+    // Requests 1 to 5 will hit the CACHE and should pass, bypassing global limit of 1
+    for ($i = 0; $i < 5; $i++) {
+        $this->getJson('/multi-db-rate-limit', $headers)->assertOk();
+        // Flush memory after each request so the next request also hits the cache
+        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+    }
+    
+    // Request 6 (also from cache) should be rate limited
+    $this->getJson('/multi-db-rate-limit', $headers)->assertStatus(429);
+});
