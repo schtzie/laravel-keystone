@@ -4,9 +4,11 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.0] — 2026-09-08
+## [2.2.0] — 2026-09-09
 
 ### Added
+- **Automated Keystone Deletion on Owner Deletion**: The `HasKeystones` trait now automatically handles deleting keystones when the owner model is deleted. If the owner model is soft-deleted, its keystones are safely revoked (preserving history) and the cache is evicted. If the owner model is hard-deleted, its keystones are permanently deleted from the database and the cache is evicted.
+- **Extensive Edge Case Test Suite**: Added a comprehensive suite of edge case tests covering orphaned keys, corrupted JSON cache fallbacks, invalid tenancy objects, null IP addresses, malformed array payload injections, and ModelNotFound exceptions during unauthorized rotation/revocation attempts.
 - **High-Performance Redis Owner Indexing (`sAdd` / `sMembers`)**: Refactored `put()` and `forgetOwner()` in `KeystoneKeyCacheRepository` to utilize Redis sets (`sAdd`, `sMembers`, `del`) for atomic owner key tracking, eliminating get-decode-encode-put race conditions and lock contention under high concurrency.
 - **Bulk Cache Eviction (`forgetMany`)**: Added `forgetMany(array $clients)` method to `KeystoneKeyCacheRepository` and refactored `PruneKeystonesCommand` to evict cached keys in bulk per chunk rather than issuing sequential single-key delete commands.
 - **Multi-Tenant Rate Limiting Key Isolation**: Updated rate limiter key generation in `AuthenticateWithKeystone` to incorporate tenant namespace segments (`keystone:rate_limit:{tenant}:{client}`), preventing key collisions across multi-database tenants.
@@ -15,6 +17,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 - **Redis Client Compatibility Tests**: Added parameterized tests validating successful cache repository resolution and execution using both `phpredis` PECL extension and the `predis/predis` package.
 - **`revoked_at` Migration Indexes**: Added database indexes on `revoked_at` in base and `single_db` migration stubs to prevent full table scans during key pruning commands.
 - **Strict PHPStan Level Max & Octane Compatibility Config**: Enhanced `phpstan.neon` with `level: max`, `checkOctaneCompatibility: true`, `checkModelProperties: true`, `checkMissingVarTagTypehint: true`, and `checkUninitializedProperties: true`.
+
+### Fixed
+- **Invalid Auth Guard Exception**: Fixed a fatal `InvalidArgumentException` bug in the `AuthenticateWithKeystone` middleware that crashed the application when an invalid or non-existent guard name was passed via the `keystone.guard` config array.
 
 ### Removed
 - **`last_used_at` & `last_used_ip` DB Tracking**: Completely removed `last_used_at` and `last_used_ip` columns, model properties, docblocks, `$casts`, and `markUsed()` method to eliminate database `UPDATE` query overhead on every authenticated request.

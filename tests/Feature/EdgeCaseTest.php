@@ -75,6 +75,19 @@ describe('A — Authentication & Signature', function () {
     });
 
     /**
+     * Feature: Authenticate entirely via query string parameters.
+     * Useful for webhooks, images, or direct GET links.
+     */
+    it('authenticates entirely via query parameters without headers', function () {
+        $user = edgeUser();
+        $key = edgeKey($user);
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
+
+        $this->getJson('/edge?client='.$key['client'].'&signature='.$sig)
+            ->assertOk();
+    });
+
+    /**
      * Bug: An empty-string client header should not match any key in the DB
      * and must return 401, not a 500 from a missing query.
      */
@@ -204,6 +217,68 @@ describe('A — Authentication & Signature', function () {
             'X-Client-Id' => $key['client'],
             'X-API-Signature' => $sig,
         ])->getJson('/edge-multi-scope')->assertUnauthorized();
+    });
+
+    /**
+     * Bug: An orphaned key (owner was hard deleted from the database) should
+     * gracefully return a 401 instead of crashing when attempting to resolve.
+     */
+    it('returns 401 when the keystone owner has been hard deleted (orphaned key)', function () {
+        $user = edgeUser();
+        $key = edgeKey($user);
+
+        // Hard delete the owner directly from the database to bypass Eloquent events
+        \Illuminate\Support\Facades\DB::table('users')->where('id', $user->id)->delete();
+
+        // Flush the resolved cache so it pulls the owner fresh
+        app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+        app(KeystoneKeyCacheRepository::class)->forget($key['client']);
+
+        edgeRequest($this, $key)->assertUnauthorized();
+    });
+
+    /**
+     * Bug: If the request IP address is null, the middleware should safely skip
+     * IP filtering instead of throwing a type error.
+     */
+    it('safely skips IP filtering when request IP is null', function () {
+        $user = edgeUser();
+        // Set an allowlist so the IP logic is forced to run
+        $key = edgeKey($user, ['ip_allowlist' => ['127.0.0.1']]);
+
+        // Mock the Request object so ip() returns null
+        $this->app->bind(Illuminate\Http\Request::class, function () {
+            $request = \Illuminate\Http\Request::create('/edge', 'GET');
+            $request->server->set('REMOTE_ADDR', null);
+            return $request;
+        });
+
+        // Use a raw test request that forces REMOTE_ADDR to null
+        $response = $this->withServerVariables(['REMOTE_ADDR' => null])
+            ->withHeaders([
+                'X-Client-Id' => $key['client'],
+                'X-API-Signature' => hash_hmac('sha256', $key['client'], $key['secret']),
+            ])
+            ->getJson('/edge');
+        
+        $response->assertOk();
+    });
+
+    /**
+     * Bug: Passing an array payload to the client or signature query params 
+     * should gracefully return a 401 rather than throwing a type error in is_string checks.
+     */
+    it('returns 401 when the client or signature is passed as an array via query param', function () {
+        $user = edgeUser();
+        $key = edgeKey($user);
+        
+        // Pass client as an array via query param
+        $this->getJson('/edge?client[]='.$key['client'])
+            ->assertUnauthorized();
+
+        // Pass signature as an array via query param
+        $this->getJson('/edge?client='.$key['client'].'&signature[]=wrong')
+            ->assertUnauthorized();
     });
 
 });
@@ -377,6 +452,24 @@ describe('C — Rate Limiting', function () {
     });
 
     /**
+     * Feature: Individual keystone rate limit value should take priority over 
+     * the global rate limit setting.
+     */
+    it('uses individual keystone rate_limit even though global rate limit is set', function () {
+        config(['keystone.rate_limit' => 100]);
+
+        $user = edgeUser();
+        // Create key with a specific rate limit that overrides the global one
+        $key = edgeKey($user, ['rate_limit' => 10]);
+        RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
+
+        $response = edgeRequest($this, $key);
+        $response->assertOk();
+        // It should use 10, not 100
+        $this->assertSame('10', $response->headers->get('X-Keystone-RateLimit-Limit'));
+    });
+
+    /**
      * Bug: A key with rate_limit = null at the model level should use the
      * global config value (not bypass it).
      */
@@ -432,6 +525,35 @@ describe('C — Rate Limiting', function () {
         // Owner B's key should be completely unaffected
         edgeRequest($this, $keyB)->assertOk();
     });
+
+    /**
+     * Feature: Comprehensive dataset-driven test for all rate limit resolution scenarios.
+     * This proves exactly how the model value and global config interact under every condition.
+     */
+    it('handles all rate limit resolution scenarios correctly', function ($modelLimit, $globalLimit, $expectedLimitHeader) {
+        config(['keystone.rate_limit' => $globalLimit]);
+
+        $user = edgeUser();
+        $key = edgeKey($user, ['rate_limit' => $modelLimit]);
+        RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
+
+        $response = edgeRequest($this, $key);
+        $response->assertOk();
+
+        if ($expectedLimitHeader === null) {
+            $this->assertFalse($response->headers->has('X-Keystone-RateLimit-Limit'), 'Expected rate limiting to be bypassed, but headers were present.');
+        } else {
+            $this->assertSame((string) $expectedLimitHeader, $response->headers->get('X-Keystone-RateLimit-Limit'));
+        }
+    })->with([
+        'keystone limit overrides global limit' => [10, 100, 10],
+        'null keystone limit falls back to global limit' => [null, 60, 60],
+        'zero keystone limit bypasses rate limiting (ignoring global)' => [0, 60, null],
+        'negative keystone limit bypasses rate limiting (ignoring global)' => [-5, 60, null],
+        'null keystone and null global bypasses rate limiting' => [null, null, null],
+        'string keystone limit is cast to integer' => ['25', 10, 25],
+        'float global config is cast to integer' => [null, 15.9, 15],
+    ]);
 
 });
 
@@ -540,6 +662,52 @@ describe('D — Cache Layer', function () {
         app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
 
         edgeRequest($this, $key)->assertOk();
+    });
+
+    /**
+     * Bug: An array cache store with corrupted JSON in the owner index must be
+     * handled gracefully without crashing json_decode or array_values.
+     */
+    it('gracefully handles corrupted JSON in the owner index during array fallback', function () {
+        $user = edgeUser();
+        $key = edgeKey($user);
+        $cache = app(KeystoneKeyCacheRepository::class);
+        $store = app(\Illuminate\Contracts\Cache\Repository::class);
+
+        // Simulate corrupted JSON in the owner index array store fallback
+        $ownerEntry = config('keystone.cache.prefix', 'keystone').':owner:'.get_class($user).':'.$user->id;
+        $store->put($ownerEntry, '{corrupted-json:');
+
+        // addClientToOwnerIndex should overwrite or gracefully ignore it
+        $cache->put($key['model']);
+
+        // forgetOwner should also handle it without fatal errors
+        $cache->forgetOwner(get_class($user), $user->id);
+
+        $this->assertTrue(true); // Reaching here means no fatal errors occurred
+    });
+
+    /**
+     * Bug: If tenancy mode is enabled but the tenant object is missing or invalid, 
+     * tenantSegment() should safely fall back to an empty string instead of throwing a fatal error.
+     */
+    it('safely falls back to empty string when tenant object is invalid but tenancy is enabled', function () {
+        config(['keystone.tenancy.mode' => 'single_db']);
+        
+        // tenant() helper doesn't exist natively in standard Laravel without Stancl/Tenancy
+        // If it doesn't exist, tenantSegment() returns ''
+        // If we mock it to return an invalid object, it should also return ''
+        
+        if (! function_exists('tenant')) {
+            function tenant() {
+                return (object) ['id' => 1]; // Missing getTenantKey() method
+            }
+        }
+
+        $cache = app(KeystoneKeyCacheRepository::class);
+        $segment = $cache->tenantSegment();
+        
+        $this->assertSame('', $segment);
     });
 
 });
@@ -746,6 +914,60 @@ describe('E — Key Lifecycle', function () {
 
         expect($result)->toBeTrue();
         $this->assertNotNull($model->fresh()->revoked_at);
+    });
+
+    /**
+     * Bug: revokeKeystone should throw ModelNotFoundException if the ID belongs
+     * to a completely different owner.
+     */
+    it('throws ModelNotFoundException when revoking a key owned by another model', function () {
+        $ownerA = edgeUser();
+        $ownerB = edgeUser();
+
+        $keyB = edgeKey($ownerB);
+
+        // Owner A attempts to revoke Owner B's key by ID
+        $ownerA->revokeKeystone($keyB['model']->id);
+    })->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+    /**
+     * Bug: rotateKeystone should throw ModelNotFoundException if the ID belongs
+     * to a completely different owner.
+     */
+    it('throws ModelNotFoundException when rotating a key owned by another model', function () {
+        $ownerA = edgeUser();
+        $ownerB = edgeUser();
+
+        $keyB = edgeKey($ownerB);
+
+        // Owner A attempts to rotate Owner B's key by ID
+        $ownerA->rotateKeystone($keyB['model']->id);
+    })->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+    /**
+     * Feature: Deleting an owner model should automatically delete its keystones 
+     * via the bootHasKeystones trait event handler.
+     */
+    it('automatically cascades deletion to keystones when the owner is hard deleted', function () {
+        $owner = edgeUser();
+        $key = edgeKey($owner);
+
+        // Warm the cache
+        $cache = app(KeystoneKeyCacheRepository::class);
+        $cache->put($key['model']);
+
+        // Assert they exist
+        expect($owner->keystones()->count())->toBe(1);
+        expect($cache->get($key['client']))->not->toBeNull();
+
+        // Perform eloquent delete (triggers deleting event)
+        $owner->delete();
+
+        // Database records should be gone
+        expect(\Schtzie\Keystone\Models\Keystone::where('id', $key['model']->id)->exists())->toBeFalse();
+
+        // Cache should be evicted
+        expect($cache->get($key['client']))->toBeNull();
     });
 
 });
@@ -1092,6 +1314,36 @@ describe('H — Config / Environment', function () {
 
         expect(Illuminate\Support\Facades\Auth::guard('web')->user())->not->toBeNull()
             ->and(Illuminate\Support\Facades\Auth::guard('api')->user())->not->toBeNull();
+    })->after(fn () => config(['keystone.guard' => null, 'auth.guards.api' => null]));
+
+    /**
+     * Bug: When keystone.guard is set to an array containing invalid or non-existent 
+     * guard names, the middleware should gracefully ignore them instead of crashing.
+     */
+    it('gracefully ignores invalid or non-existent guards when keystone.guard is configured', function () {
+        config(['keystone.guard' => ['web', 'non_existent_guard_123', null, '']]);
+
+        $authUser = new class extends Illuminate\Foundation\Auth\User
+        {
+            use Schtzie\Keystone\Traits\HasKeystones;
+
+            protected $table = 'users';
+
+            protected $guarded = [];
+        };
+
+        $user = $authUser::create(['name' => 'Auth User']);
+        $key = $user->createKeystone('Auth Key');
+        $sig = hash_hmac('sha256', $key['client'], $key['secret']);
+
+        // The request should still succeed and authenticate into 'web'
+        $this->withHeaders([
+            'X-Client-Id' => $key['client'],
+            'X-API-Signature' => $sig,
+        ])->getJson('/edge')->assertOk();
+
+        // Check valid guard
+        expect(Illuminate\Support\Facades\Auth::guard('web')->user())->not->toBeNull();
     })->after(fn () => config(['keystone.guard' => null]));
 
 });

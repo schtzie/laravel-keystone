@@ -515,6 +515,14 @@ echo $new['secret'];
 
 ---
 
+### Automated Deletion
+
+When an owner model (e.g. `User`) is deleted, its keystones are automatically managed by the trait:
+- **Soft Deletes**: If your model uses Laravel's `SoftDeletes`, all active keystones are automatically revoked (which preserves history) and evicted from the cache.
+- **Hard Deletes**: If the model is permanently deleted, all related keystones are completely deleted from the database to prevent orphaned rows, and the cache is immediately evicted.
+
+---
+
 ### Pruning Old Keys
 
 The `keystone:prune` command permanently deletes revoked keys older than the configured retention period and evicts their Redis entries:

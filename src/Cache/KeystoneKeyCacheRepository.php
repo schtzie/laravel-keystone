@@ -34,8 +34,6 @@ final class KeystoneKeyCacheRepository
         private readonly ?int $ttl,
     ) {}
 
-    // ── Public API ─────────────────────────────────────────────────────────
-
     /**
      * Retrieve a cached Keystone by its plain client value.
      * Returns null on a cache miss.

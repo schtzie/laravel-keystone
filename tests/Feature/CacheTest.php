@@ -30,6 +30,10 @@ function signedHeaders(array $result): array
     ];
 }
 
+beforeEach(function (): void {
+    config(['keystone.cache.enabled' => true]);
+});
+
 // ── Write-Through on Cache Miss ────────────────────────────────────────────
 
 it('populates cache after first DB lookup (cache miss)', function (): void {
@@ -114,25 +118,40 @@ it('evicts the old key from cache when rotated', function (): void {
 
 // ── Cache Disabled ─────────────────────────────────────────────────────────
 
-it('always hits the database when cache is disabled', function (): void {
-    config(['keystone.cache.enabled' => false]);
+it('handles cache enabled option', function (bool $enabled): void {
+    config(['keystone.cache.enabled' => $enabled]);
+    app()->forgetInstance(KeystoneKeyCacheRepository::class);
+    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
 
-    Route::middleware('api.key')->get('/cache-disabled', fn () => response()->json(['ok' => true]));
+    Route::middleware('api.key')->get('/cache-enabled-test', fn () => response()->json(['ok' => true]));
+
+    // First request - always hits DB. If enabled=true, it writes to cache.
+    $this->getJson('/cache-enabled-test', signedHeaders($result))->assertOk();
 
     $queries = 0;
     Illuminate\Support\Facades\DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
-    $this->getJson('/cache-disabled', signedHeaders($result))->assertOk();
+    if (! $enabled) {
+        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+    }
 
-    expect($queries)->toBeGreaterThan(0);
+    // Second request
+    $this->getJson('/cache-enabled-test', signedHeaders($result))->assertOk();
 
-    // Cache should remain empty
-    expect(cacheRepo()->get($result['client']))->toBeNull();
-})->after(function (): void {
+    if ($enabled) {
+        // Cache is enabled, second request should hit cache (0 DB queries)
+        expect($queries)->toBe(0);
+        expect(cacheRepo()->get($result['client']))->not->toBeNull();
+    } else {
+        // Cache is disabled, second request must hit DB again
+        expect($queries)->toBeGreaterThan(0);
+        expect(cacheRepo()->get($result['client']))->toBeNull();
+    }
+})->with([true, false])->after(function (): void {
     config(['keystone.cache.enabled' => true]);
 });
 

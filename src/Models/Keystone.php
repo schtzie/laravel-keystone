@@ -59,8 +59,6 @@ class Keystone extends Model
         return is_string($table) ? $table : 'keystoneables';
     }
 
-    // ── Relationships ──────────────────────────────────────────────────────
-
     /**
      * Polymorphic owner — any model using the HasKeystones trait.
      *
@@ -70,8 +68,6 @@ class Keystone extends Model
     {
         return $this->morphTo();
     }
-
-    // ── Query Scopes ───────────────────────────────────────────────────────
 
     /**
      * Keys that are neither revoked nor expired.
@@ -109,8 +105,6 @@ class Keystone extends Model
             $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
         });
     }
-
-    // ── Business Logic ─────────────────────────────────────────────────────
 
     /**
      * Returns true if the key is not revoked and not expired.
