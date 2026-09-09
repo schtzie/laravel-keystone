@@ -25,7 +25,7 @@ final class KeystoneServiceProvider extends ServiceProvider
             'keystone',
         );
 
-        $this->app->singleton(KeystoneKeyCacheRepository::class, function (Application $app): KeystoneKeyCacheRepository {
+        $this->app->scoped(KeystoneKeyCacheRepository::class, function (Application $app): KeystoneKeyCacheRepository {
             /** @var \Illuminate\Cache\CacheManager $cacheManager */
             $cacheManager = $app->make('cache');
             $storeName = config('keystone.cache.store', 'redis');
@@ -40,7 +40,7 @@ final class KeystoneServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(KeystoneService::class, function (Application $app): KeystoneService {
+        $this->app->scoped(KeystoneService::class, function (Application $app): KeystoneService {
             /** @var KeystoneKeyCacheRepository $cacheRepo */
             $cacheRepo = $app->make(KeystoneKeyCacheRepository::class);
 
