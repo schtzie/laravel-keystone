@@ -1,0 +1,79 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Creates the `keystone_access_logs` table — the backing store for Keystone's
+ * opt-in request audit trail and usage analytics features.
+ *
+ * This table is append-only by design: rows are inserted on every authenticated
+ * request and every rejected authentication attempt (when access logging is
+ * enabled), but never updated. Old entries are eventually removed by the
+ * `keystone:prune --access-logs` Artisan command.
+ *
+ * Column overview:
+ *   - `keystone_id`       — FK-style reference to the matched API key (nullable
+ *                           for requests rejected before a key could be resolved).
+ *   - `keystoneable_type` — Polymorphic owner type for owner-level analytics.
+ *   - `keystoneable_id`   — Polymorphic owner primary key.
+ *   - `tenant_id`         — Tenant identifier populated in single_db tenancy mode.
+ *   - `ip_address`        — Client IP (v4 or v6, up to 45 characters).
+ *   - `method`            — HTTP verb (GET, POST, etc.).
+ *   - `path`              — URL path segment (without query string).
+ *   - `scopes_used`       — JSON array of scopes the authenticated key carried.
+ *   - `status_code`       — HTTP status returned (200, 401, 403, 429, etc.).
+ *   - `event`             — Machine-readable event name; see KeystoneAccessLog.
+ *   - `created_at`        — Insertion timestamp (indexed for time-range queries).
+ *
+ * Publish via:
+ *   php artisan vendor:publish --tag=keystone-migrations-access-logs
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        $table = config('keystone.access_log.table', 'keystone_access_logs');
+
+        Schema::create($table, function (Blueprint $table): void {
+            $table->id();
+
+            // Nullable — requests rejected before key resolution have no keystone_id
+            $table->unsignedBigInteger('keystone_id')->nullable()->index();
+
+            // Polymorphic reference to the owner model (User, Organisation, etc.)
+            $table->string('keystoneable_type')->nullable();
+            $table->unsignedBigInteger('keystoneable_id')->nullable();
+
+            // Tenant context — only populated in single_db tenancy mode
+            $table->string('tenant_id')->nullable()->index();
+
+            // Request metadata
+            $table->string('ip_address', 45)->nullable();
+            $table->string('method', 10);
+            $table->string('path', 1024);
+            $table->json('scopes_used')->nullable();
+
+            // Outcome
+            $table->unsignedSmallInteger('status_code');
+            $table->string('event', 40);
+
+            // Append-only — no updated_at column
+            $table->timestamp('created_at')->useCurrent()->index('keystone_access_logs_created_at_index');
+
+            // Composite index: most common analytics query is per-key over time
+            $table->index(['keystone_id', 'created_at'], 'keystone_access_logs_key_time_index');
+
+            // Composite index: owner-level usage dashboards
+            $table->index(['keystoneable_type', 'keystoneable_id', 'created_at'], 'keystone_access_logs_owner_index');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists(config('keystone.access_log.table', 'keystone_access_logs'));
+    }
+};

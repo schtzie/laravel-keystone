@@ -5,15 +5,23 @@
         "laravel",
         "api-key",
         "authentication",
+        "authorization",
+        "security",
         "multi-tenancy",
+        "tenancy",
         "redis",
-        "hmac"
+        "hmac",
+        "rate-limiting",
+        "payload-signing",
+        "analytics",
+        "access-logging"
     ],
     "homepage": "https://github.com/schtzie/laravel-keystone",
     "license": "MIT",
     "authors": [
         {
-            "name": "Schtzie"
+            "name": "Schatzie",
+            "email": "ie.schtz.23@gmail.com" 
         }
     ],
     "require": {
@@ -25,7 +33,7 @@
         "illuminate/support": "^11.0|^12.0|^13.0"
     },
     "suggest": {
-        "predis/predis": "Required when using the Redis cache store without the PHP Redis extension (^2.0).",
+        "predis/predis": "Required when using the Redis cache store without the PHP Redis extension (^2.0 | ^3.0).",
         "stancl/tenancy": "Required for multi-tenant support via stancl/tenancy v4 (^4.0)."
     },
     "require-dev": {
@@ -60,7 +68,8 @@
                 "Schtzie\\Keystone\\KeystoneServiceProvider"
             ],
             "aliases": {
-                "Keystone": "Schtzie\\Keystone\\Facades\\Keystone"
+                "Keystone": "Schtzie\\Keystone\\Facades\\Keystone",
+                "KeystoneAnalytics": "Schtzie\\Keystone\\Facades\\KeystoneAnalytics"
             }
         }
     },

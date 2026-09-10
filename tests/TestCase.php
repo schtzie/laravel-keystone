@@ -18,7 +18,8 @@ abstract class TestCase extends OrchestraTestCase
     protected function getPackageAliases($app): array
     {
         return [
-            'Keystone' => \Schtzie\Keystone\Facades\Keystone::class,
+            'Keystone'          => \Schtzie\Keystone\Facades\Keystone::class,
+            'KeystoneAnalytics' => \Schtzie\Keystone\Facades\KeystoneAnalytics::class,
         ];
     }
 
@@ -41,7 +42,11 @@ abstract class TestCase extends OrchestraTestCase
 
         // Default: no tenancy
         $app['config']->set('keystone.tenancy.mode', 'none');
+
+        // App key required for session-based tests (e.g. REST routes with actingAs)
+        $app['config']->set('app.key', 'base64:' . base64_encode(random_bytes(32)));
     }
+
 
     protected function defineDatabaseMigrations(): void
     {

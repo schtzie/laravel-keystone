@@ -4,7 +4,98 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-09-10
+
+### Added
+
+#### Security — Replay-Attack Protection
+- **Timestamp-based replay detection**: Optional `X-Timestamp` header validation in `KeystoneService`. When `keystone.replay_protection.enabled = true`, every request must include a Unix timestamp; requests where `|now − timestamp|` exceeds the configurable `window_seconds` (default: 30 s) are rejected before any cache or database lookup occurs.
+- Configurable timestamp header name (`keystone.replay_protection.timestamp_header`) and window size (`keystone.replay_protection.window_seconds`).
+
+#### Security — HMAC Payload Signing (Request Body Integrity)
+- **`VerifyKeystonePayload` middleware** (`api.key.payload` alias): Computes `hash_hmac('sha256', body, secret)` server-side and compares it against a configurable request header (`keystone.payload_signing.header`, default `X-Body-Hash`).
+- `require_on_empty` option (default: `true`) — when `false`, requests with an empty body skip the body-hash check (useful for GET/HEAD routes).
+- Must be stacked **after** `api.key` (which resolves the secret). Returns `422 Unprocessable Content` on signature mismatch.
+
+#### Rate Limiting — Strategy System
+- **`RateLimitStrategy` contract** — uniform interface (`attempt`, `remaining`, `retryAfter`) implemented by all three built-in strategies.
+- **`FixedWindowStrategy`**: Delegates to Laravel's built-in `RateLimiter`; zero additional infrastructure.
+- **`SlidingWindowStrategy`**: Redis sorted-set (ZSET) based sliding window; eliminates boundary-burst spikes. Gracefully falls back to `FixedWindowStrategy` on non-Redis stores.
+- **`TokenBucketStrategy`**: Atomic Lua-scripted token bucket on Redis; allows controlled bursting while guaranteeing average rate. Gracefully falls back to `FixedWindowStrategy` on non-Redis stores.
+- Strategy selected via `keystone.rate_limit_strategy` config key (`fixed_window` | `sliding_window` | `token_bucket`).
+- `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `Retry-After` response headers on all strategies.
+
+#### Access Logging
+- **`KeystoneAccessLog` Eloquent model** + migration (`keystone_access_logs`): Append-only log of every authenticated request and every rejection; `updated_at` disabled by design.
+- **`KeystoneAccessLogger`** event listener: Auto-registered when `keystone.access_log.enabled = true`. Supports three output drivers:
+  - `database` — inserts a row via Eloquent.
+  - `log` — writes structured JSON to a named log channel.
+  - `both` — writes to both simultaneously.
+- Events logged: `authenticated`, `rejected_invalid`, `rejected_replay`, `rejected_ip`, `rejected_scope`, `rate_limited`.
+- Failure is silently swallowed — a broken log write never interrupts the request lifecycle.
+- Configurable table name (`keystone.access_log.table`) and log channel (`keystone.access_log.channel`).
+
+#### Analytics
+- **`KeystoneAnalytics` service** + **`KeystoneAnalytics` facade**:
+  - `dailyUsage(Keystone $key, int $days = 7)` — day-by-day breakdown grouped by event type.
+  - `topKeys(int $limit = 10)` — ranked list of most-used keys (authenticated events only).
+  - `ownerUsage(Model $owner, int $days = 30)` — daily totals across all keys for a given owner.
+  - `rejectionSummary(Keystone $key, int $days = 7)` — rejection counts grouped by reason.
+  - `totalRequests(int $days = 30)` — high-level authenticated request count metric.
+
+#### Events
+Seven new events dispatched at key lifecycle moments:
+- `KeystoneAuthenticated` — successful authentication
+- `KeystoneAuthFailed` — any rejection (carries `$reason` string)
+- `KeystoneRateLimitExceeded` — rate limit hit
+- `KeystoneCreated` — key pair created
+- `KeystoneRevoked` — key soft-revoked
+- `KeystoneRotated` — key rotated (carries both old and new `Keystone` instances)
+- `KeystoneExpired` — key expired on access attempt
+
+#### REST API Routes
+- **`keystones.index`** (`GET /keystones`) — list active keys for the authenticated user.
+- **`keystones.store`** (`POST /keystones`) — create a new key pair; returns `{ client, secret, id, name, scopes, expires_at, created_at }`.
+- **`keystones.destroy`** (`DELETE /keystones/{id}`) — revoke a specific key.
+- **`keystones.rotate`** (`POST /keystones/{id}/rotate`) — rotate a key, returning fresh credentials.
+- Routes registered under `keystone.routes.prefix` (default: `keystones`) and protected by `keystone.routes.middleware` (default: `['auth']`).
+- Route names follow plural convention: `keystones.index`, `keystones.store`, `keystones.destroy`, `keystones.rotate`.
+
+#### Artisan Commands (6 new, 1 updated)
+
+| Command | Description |
+|---|---|
+| `keystone:generate` | Generate a new API key pair for any Eloquent model owner |
+| `keystone:revoke` | Immediately revoke a key by client ID (with confirmation prompt) |
+| `keystone:list` | List keys with status, owner, scopes, expiry; filterable by owner / status |
+| `keystone:status` | Display key counts, cache config, and access-log stats at a glance |
+| `keystone:rotate-expiring` | Auto-rotate keys expiring within N days (default: 7); supports `--dry-run` |
+| `keystone:prune` *(updated)* | Added `--access-logs` flag to prune old `keystone_access_logs` rows |
+
+#### Testing Helpers
+- **`KeystoneFake`** — drop-in test double implementing `KeystoneServiceContract`:
+  - `Keystone::fake(?Keystone $key)` — swap the real service for a fake (can force `null` to simulate all auth failures).
+  - `assertAuthenticatedTimes(int $times)` — assert number of successful auth calls.
+  - `assertNotAuthenticated()` — assert no requests were authenticated.
+- **`actingWithKeystone(Keystone $key)`** — `TestCase` macro; sets correct `X-Client-Id` and `X-API-Signature` headers automatically.
+- **`actingWithKeystoneScopes(Keystone $key, array $scopes)`** — same as above but temporarily overrides scopes.
+- **`KeystoneFactory`** — fluent test factory with `expired()`, `revoked()`, `withScopes()`, `withMetadata()` helpers.
+
+#### Test Suite Expansion
+- 218 tests across 17 feature test classes (7 skipped — Redis-specific strategies; graceful array-driver fallback).
+- New test classes: `EventsTest`, `GracePeriodTest`, `PayloadSigningTest`, `PerformanceRefactorTest`, `RestRoutesTest`, `ReplayProtectionTest`, `TestingHelpersTest`.
+
+### Changed
+- **`HasKeystones::createKeystone`**: Extended with an `options` array parameter accepting `description`, `metadata`, `ip_allowlist`, `ip_blocklist`, `rate_limit` — all applied to the model on creation.
+- **`config/keystone.php`**: Extended with `replay_protection.*`, `payload_signing.*`, `rate_limit_strategy`, `access_log.*`, `routes.*`, and `rotation_grace_seconds` sections.
+
+### Fixed
+- **PHPStan level max — zero errors**: Resolved all 57 original static analysis errors across the codebase. Config `mixed` returns guarded with `is_numeric`/`is_string`/`is_scalar`; Redis `->command()` results guarded with `is_array`; all `EloquentCollection` generics correctly typed; `phpstan.neon` `ignoreErrors` patterns used only where PHPStan cannot infer trait-injected method signatures (`HasKeystones`).
+
+---
+
 ## [2.2.0] — 2026-09-09
+
 
 ### Added
 - **Laravel Octane & FrankenPHP Support**: Transitioned the core `KeystoneService` from a `singleton` to a `scoped` binding. This guarantees the in-memory `$resolved` key map is automatically flushed between requests, eliminating memory leaks and stale authentication state in long-running PHP processes.
@@ -265,13 +356,20 @@ Features under consideration for future releases:
 
 - [x] IP allowlist / blocklist per Client
 - [x] Per-key rate limiting
+- [x] Replay-attack protection
+- [x] HMAC payload / body-integrity signing
+- [x] Advanced rate-limit strategies (sliding window, token bucket)
+- [x] Access logging & analytics
+- [x] Artisan key management commands
+- [x] REST API key management routes
+- [x] Testing helpers (fake, factory, macros)
 - [ ] Webhook signing support (outbound HMAC signing)
-- [ ] Key usage analytics endpoint
 - [ ] Automatic key expiry notifications
 - [ ] Dashboard UI via Filament / Livewire
 
 ---
 
+[2.3.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.3.0
 [2.2.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.2.0
 [2.1.3]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.3
 [2.1.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.2
@@ -282,4 +380,4 @@ Features under consideration for future releases:
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.3.0...HEAD

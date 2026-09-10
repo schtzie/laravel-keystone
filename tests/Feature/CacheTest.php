@@ -30,6 +30,38 @@ function signedHeaders(array $result): array
     ];
 }
 
+dataset('cache_stores', [
+    'array', 'database', 'file', 'memcached', 'redis', 'dynamodb', 'octane', 'null'
+]);
+
+function setupCacheStore(string $store): void
+{
+    if ($store === 'database' && !\Illuminate\Support\Facades\Schema::hasTable('cache')) {
+        \Illuminate\Support\Facades\Schema::create('cache', function (\Illuminate\Database\Schema\Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
+    }
+
+    try {
+        if ($store === 'redis') {
+            config(['keystone.cache.store' => 'redis']);
+            app()->forgetInstance('redis');
+            \Illuminate\Support\Facades\Redis::clearResolvedInstances();
+            \Illuminate\Support\Facades\Cache::forgetDriver('redis');
+        } else {
+            config(['keystone.cache.store' => $store]);
+        }
+        \Illuminate\Support\Facades\Cache::store($store)->has('ping');
+    } catch (\Throwable $e) {
+        test()->markTestSkipped("Store [$store] is not available: {$e->getMessage()}");
+    }
+
+    app()->forgetInstance(KeystoneKeyCacheRepository::class);
+    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
+}
+
 beforeEach(function (): void {
     config(['keystone.cache.enabled' => true]);
 });
@@ -180,10 +212,7 @@ it('flushes the cache repository cleanly', function (): void {
 // ── Cache Configuration Scenarios ──────────────────────────────────────────
 
 it('supports different cache stores', function (string $store): void {
-    // We only test stores that are likely available in the default testing environment
-    config(['keystone.cache.store' => $store]);
-    app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
+    setupCacheStore($store);
 
     [$user, $result] = makeUserWithKey();
     
@@ -191,9 +220,14 @@ it('supports different cache stores', function (string $store): void {
     
     $expectedKey = 'keystone:key:'.$result['client'];
     
+    if ($store === 'null') {
+        expect(cacheRepo()->get($result['client']))->toBeNull();
+        return;
+    }
+
     expect(cacheRepo()->get($result['client']))->not->toBeNull()
-        ->and(Cache::store($store)->has($expectedKey))->toBeTrue();
-})->with(['array', 'file']);
+        ->and(\Illuminate\Support\Facades\Cache::store($store)->has($expectedKey))->toBeTrue();
+})->with('cache_stores');
 
 it('supports both phpredis and predis redis clients', function (string $redisClient): void {
     config([
@@ -218,10 +252,13 @@ it('supports both phpredis and predis redis clients', function (string $redisCli
         ->and(cacheRepo()->get($result['client']))->not->toBeNull();
 })->with(['phpredis', 'predis']);
 
-it('respects the ttl configuration', function (): void {
+it('respects the ttl configuration', function (string $store): void {
+    if ($store === 'null') {
+        test()->markTestSkipped('Not applicable for null store');
+    }
+    
+    setupCacheStore($store);
     config(['keystone.cache.ttl' => 60]);
-    app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
     
@@ -232,12 +269,16 @@ it('respects the ttl configuration', function (): void {
     $this->travel(61)->seconds();
 
     expect(cacheRepo()->get($result['client']))->toBeNull();
-});
+    $this->travelBack();
+})->with(['array', 'database', 'file']);
 
-it('keeps cache indefinitely if ttl is null', function (): void {
+it('keeps cache indefinitely if ttl is null', function (string $store): void {
+    if (in_array($store, ['null', 'database'])) {
+        test()->markTestSkipped("Not applicable for $store store");
+    }
+    
+    setupCacheStore($store);
     config(['keystone.cache.ttl' => null]);
-    app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
     
@@ -248,15 +289,19 @@ it('keeps cache indefinitely if ttl is null', function (): void {
     $this->travel(10)->years();
 
     expect(cacheRepo()->get($result['client']))->not->toBeNull();
-});
+    $this->travelBack();
+})->with(['array', 'file']);
 
-it('does not write-through to cache on miss if warm_on_miss is false', function (): void {
+it('does not write-through to cache on miss if warm_on_miss is false', function (string $store): void {
+    if ($store === 'null') {
+        test()->markTestSkipped('Not applicable for null store');
+    }
+    
+    setupCacheStore($store);
     config([
         'keystone.cache.warm_on_miss' => false,
         'keystone.cache.refresh_on_use' => false,
     ]);
-    app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
 
@@ -266,13 +311,16 @@ it('does not write-through to cache on miss if warm_on_miss is false', function 
 
     // Cache should still be empty
     expect(cacheRepo()->get($result['client']))->toBeNull();
-});
+})->with('cache_stores');
 
-it('does not refresh cache ttl on use if refresh_on_use is false', function (): void {
+it('does not refresh cache ttl on use if refresh_on_use is false', function (string $store): void {
+    if ($store === 'null') {
+        test()->markTestSkipped('Not applicable for null store');
+    }
+    
+    setupCacheStore($store);
     config(['keystone.cache.refresh_on_use' => false]);
     config(['keystone.cache.ttl' => 60]);
-    app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
     
@@ -288,13 +336,17 @@ it('does not refresh cache ttl on use if refresh_on_use is false', function (): 
 
     // Total 61 seconds elapsed, should be expired since it wasn't refreshed
     expect(cacheRepo()->get($result['client']))->toBeNull();
-});
+    $this->travelBack();
+})->with(['array', 'database', 'file']);
 
-it('refreshes cache ttl on use if refresh_on_use is true', function (): void {
+it('refreshes cache ttl on use if refresh_on_use is true', function (string $store): void {
+    if ($store === 'null') {
+        test()->markTestSkipped('Not applicable for null store');
+    }
+    
+    setupCacheStore($store);
     config(['keystone.cache.refresh_on_use' => true]);
     config(['keystone.cache.ttl' => 60]);
-    app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
     
@@ -310,7 +362,8 @@ it('refreshes cache ttl on use if refresh_on_use is true', function (): void {
 
     // Total 61 seconds elapsed, but refreshed at 30 seconds, so it should still be alive
     expect(cacheRepo()->get($result['client']))->not->toBeNull();
-});
+    $this->travelBack();
+})->with(['array', 'database', 'file']);
 
 // ── Tenancy Cache Scenarios ──────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 # Laravel Keystone
 
-> Client management for Laravel — attach Clients to any Eloquent model, authenticate requests via HMAC SHA-256, cache keys in Redis for zero-database-per-request throughput, and run natively in single-database or multi-database multi-tenant architectures.
+> Client management for Laravel — attach Clients to any Eloquent model, authenticate requests via HMAC SHA-256 with replay-attack protection and payload signing, cache keys in Redis for zero-database-per-request throughput, enforce per-key rate limits using fixed, sliding-window, or token-bucket strategies, and run natively in single-database or multi-database multi-tenant architectures.
+
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/schtzie/laravel-keystone.svg?style=flat-square)](https://packagist.org/packages/schtzie/laravel-keystone)
 [![Total Downloads](https://img.shields.io/packagist/dt/schtzie/laravel-keystone.svg?style=flat-square)](https://packagist.org/packages/schtzie/laravel-keystone)
@@ -19,12 +20,19 @@
 - [Configuration](#configuration)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
-  - [HasKeystones Trait](#hasapikeys-trait)
-  - [Creating Clients](#creating-api-keys)
+  - [HasKeystones Trait](#haskeystones-trait)
+  - [Creating Clients](#creating-clients)
   - [HMAC SHA-256 Authentication](#hmac-sha-256-authentication)
   - [Middleware](#middleware)
   - [Scope Enforcement](#scope-enforcement)
+  - [IP Filtering](#ip-filtering-allowlist--blocklist)
+  - [Replay-Attack Protection](#replay-attack-protection)
+  - [Payload Signing](#payload-signing-body-integrity)
   - [Accessing the Authenticated Owner](#accessing-the-authenticated-owner)
+- [Rate Limiting](#rate-limiting)
+  - [Rate Limit Strategies](#rate-limit-strategies)
+  - [Per-Key Rate Limits](#per-key-rate-limits)
+  - [Rate Limit Headers](#rate-limit-headers)
 - [Caching](#caching)
   - [How It Works](#how-it-works)
   - [Cache Configuration](#cache-configuration)
@@ -32,7 +40,12 @@
 - [Key Lifecycle](#key-lifecycle)
   - [Revoking Keys](#revoking-keys)
   - [Rotating Keys](#rotating-keys)
+  - [Grace Periods](#grace-periods)
   - [Pruning Old Keys](#pruning-old-keys)
+- [Access Logging](#access-logging)
+- [Analytics](#analytics)
+- [Events](#events)
+- [REST API Routes](#rest-api-routes)
 - [Multi-Tenancy (stancl/tenancy v4)](#multi-tenancy-stancltenancy-v4)
   - [Mode: none (default)](#mode-none-default)
   - [Mode: single\_db](#mode-single_db)
@@ -41,6 +54,8 @@
 - [Artisan Commands](#artisan-commands)
 - [Events & Observers](#events--observers)
 - [Testing Your Application](#testing-your-application)
+
+
 
 ---
 
@@ -373,7 +388,67 @@ $result = $user->createKeystone(
 
 ---
 
+### Replay-Attack Protection
+
+Enable timestamp-based replay detection to reject requests that are captured and replayed after the fact:
+
+```php
+// config/keystone.php
+'replay_protection' => [
+    'enabled'          => true,
+    'timestamp_header' => 'X-Timestamp',  // header the client sends
+    'window_seconds'   => 30,             // reject if |now - timestamp| > window
+],
+```
+
+The client must include the current Unix timestamp (seconds) in the `X-Timestamp` header. Requests outside the window are rejected **before** any cache or database lookup:
+
+```php
+Http::withHeaders([
+    'X-Client-Id'     => $client,
+    'X-API-Signature' => hash_hmac('sha256', $client, $secret),
+    'X-Timestamp'     => time(),
+])->get('/api/resource');
+```
+
+---
+
+### Payload Signing (Body Integrity)
+
+The `api.key.payload` middleware verifies the request body has not been tampered with in transit. Stack it **after** `api.key` (which resolves the secret):
+
+```php
+Route::middleware(['api.key', 'api.key.payload'])->group(function () {
+    Route::post('/webhooks/inbound', [WebhookController::class, 'handle']);
+});
+```
+
+The client computes `hash_hmac('sha256', $body, $secret)` and sends it in the `X-Body-Hash` header:
+
+```php
+$body = json_encode($payload);
+
+Http::withHeaders([
+    'X-Client-Id'     => $client,
+    'X-API-Signature' => hash_hmac('sha256', $client, $secret),
+    'X-Body-Hash'     => hash_hmac('sha256', $body, $secret),
+    'Content-Type'    => 'application/json',
+])->withBody($body, 'application/json')->post('/api/webhooks/inbound');
+```
+
+A mismatch returns `422 Unprocessable Content`. Configure via `keystone.payload_signing.*`:
+
+```php
+'payload_signing' => [
+    'header'           => 'X-Body-Hash',
+    'require_on_empty' => false,  // skip check for requests with no body (GET/HEAD)
+],
+```
+
+---
+
 ### Accessing the Authenticated Owner
+
 
 After successful authentication, the resolved **keystoneable owner** is available in several ways:
 
@@ -479,6 +554,50 @@ Cache entries are **automatically evicted** on:
 
 ---
 
+## Rate Limiting
+
+### Rate Limit Strategies
+
+Keystone supports three pluggable rate-limiting strategies, configured via `keystone.rate_limit_strategy`:
+
+| Strategy | Config value | Description |
+|---|---|---|
+| **Fixed Window** | `fixed_window` (default) | Standard counter per window; delegates to Laravel's `RateLimiter`. Zero Redis dependency. |
+| **Sliding Window** | `sliding_window` | Redis sorted-set approach; eliminates boundary burst spikes. Falls back to fixed window on non-Redis stores. |
+| **Token Bucket** | `token_bucket` | Atomic Lua-scripted bucket on Redis; allows bursting up to capacity while guaranteeing average rate. Falls back to fixed window on non-Redis stores. |
+
+```php
+// config/keystone.php
+'rate_limit_strategy' => env('KEYSTONE_RATE_LIMIT_STRATEGY', 'fixed_window'),
+```
+
+### Per-Key Rate Limits
+
+Set a global fallback limit in config, and override per key when creating:
+
+```php
+// config/keystone.php — global fallback
+'rate_limit'                 => 60,   // requests per window
+'rate_limit_window_seconds'  => 60,   // window size in seconds
+
+// Per-key override at creation time
+$result = $user->createKeystone('High-Volume Key', [], null, [
+    'rate_limit' => 1000,  // overrides the global config
+]);
+```
+
+### Rate Limit Headers
+
+All authenticated responses include standard rate-limit headers:
+
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 42
+Retry-After: 15   (only present when rate limit is exceeded — 429 response)
+```
+
+---
+
 ## Key Lifecycle
 
 ### Revoking Keys
@@ -515,6 +634,19 @@ echo $new['secret'];
 
 ---
 
+### Grace Periods
+
+When rotating keys, configure a grace period so consumers can pick up the new credentials without a service interruption:
+
+```php
+// config/keystone.php
+'rotation_grace_seconds' => 300,  // old key valid for 5 more minutes after rotation
+```
+
+During the grace period, the old key remains authenticated but a `grace_expires_at` timestamp is stamped on its record. `keystone:list` displays keys in grace period with a **Grace Period** status label.
+
+---
+
 ### Automated Deletion
 
 When an owner model (e.g. `User`) is deleted, its keystones are automatically managed by the trait:
@@ -533,6 +665,9 @@ php artisan keystone:prune
 
 # Override retention period
 php artisan keystone:prune --days=7
+
+# Also prune old access log rows
+php artisan keystone:prune --access-logs --log-days=90
 ```
 
 Schedule it in your console kernel:
@@ -543,6 +678,154 @@ Schedule::command('keystone:prune')->daily();
 ```
 
 ---
+
+## Access Logging
+
+Enable structured access logging to record every authentication event:
+
+```php
+// config/keystone.php
+'access_log' => [
+    'enabled' => true,
+    'driver'  => 'database',  // 'database' | 'log' | 'both'
+    'table'   => 'keystone_access_logs',
+    'channel' => null,        // Laravel log channel name (null = default)
+],
+```
+
+Publish and run the access log migration:
+
+```bash
+php artisan vendor:publish --tag=keystone-migrations-access-log
+php artisan migrate
+```
+
+Events recorded:
+
+| Event | Trigger |
+|---|---|
+| `authenticated` | Request passed all checks |
+| `rejected_invalid` | Key not found, revoked, expired, or HMAC mismatch |
+| `rejected_replay` | Timestamp outside the replay-protection window |
+| `rejected_ip` | IP address failed allowlist or blocklist |
+| `rejected_scope` | Key lacked a required scope |
+| `rate_limited` | Key exceeded its rate limit |
+
+Log writes are wrapped in a `try/catch` — a broken storage backend never interrupts the request lifecycle.
+
+---
+
+## Analytics
+
+Query key usage statistics via the `KeystoneAnalytics` facade (requires access logging to be enabled):
+
+```php
+use Schtzie\Keystone\Facades\KeystoneAnalytics;
+
+$key = Keystone::findByKeystone('ks_abc...');
+
+// Day-by-day breakdown grouped by event type (last 7 days)
+$daily = KeystoneAnalytics::dailyUsage($key, days: 7);
+
+// Top 10 most-used keys (authenticated events only)
+$topKeys = KeystoneAnalytics::topKeys(limit: 10);
+
+// Daily totals for all keys owned by a user (last 30 days)
+$ownerStats = KeystoneAnalytics::ownerUsage($user, days: 30);
+
+// Rejection summary grouped by reason (last 7 days)
+$rejections = KeystoneAnalytics::rejectionSummary($key, days: 7);
+
+// Total authenticated requests in the last 30 days
+$total = KeystoneAnalytics::totalRequests(days: 30);
+```
+
+---
+
+## Events
+
+Keystone dispatches events at every significant lifecycle moment. Listen to them in your `EventServiceProvider`:
+
+```php
+use Schtzie\Keystone\Events\KeystoneAuthenticated;
+use Schtzie\Keystone\Events\KeystoneAuthFailed;
+use Schtzie\Keystone\Events\KeystoneCreated;
+use Schtzie\Keystone\Events\KeystoneRevoked;
+use Schtzie\Keystone\Events\KeystoneRotated;
+use Schtzie\Keystone\Events\KeystoneRateLimitExceeded;
+use Schtzie\Keystone\Events\KeystoneExpired;
+
+protected $listen = [
+    KeystoneAuthenticated::class      => [SendUsageMetric::class],
+    KeystoneAuthFailed::class         => [AlertOnRepeatedFailures::class],
+    KeystoneRateLimitExceeded::class  => [NotifyRateLimitBreach::class],
+    KeystoneCreated::class            => [SendWelcomeEmail::class],
+    KeystoneRevoked::class            => [AuditKeyRevocation::class],
+    KeystoneRotated::class            => [NotifyKeyRotation::class],
+    KeystoneExpired::class            => [NotifyKeyExpiry::class],
+];
+```
+
+| Event class | Payload |
+|---|---|
+| `KeystoneAuthenticated` | `$keystone`, `$request` |
+| `KeystoneAuthFailed` | `$reason` (string), `$request` |
+| `KeystoneRateLimitExceeded` | `$keystone`, `$request` |
+| `KeystoneCreated` | `$keystone` |
+| `KeystoneRevoked` | `$keystone` |
+| `KeystoneRotated` | `$oldKeystone`, `$newKeystone` |
+| `KeystoneExpired` | `$keystone`, `$request` |
+
+---
+
+## REST API Routes
+
+Keystone ships optional ready-made routes for client-side key management. Enable them in config:
+
+```php
+// config/keystone.php
+'routes' => [
+    'enabled'    => true,
+    'prefix'     => 'keystones',    // accessible at /keystones
+    'middleware' => ['auth'],       // standard Laravel auth guard
+],
+```
+
+| Method | Path | Route name | Description |
+|---|---|---|---|
+| `GET` | `/keystones` | `keystones.index` | List active keys for the authenticated user |
+| `POST` | `/keystones` | `keystones.store` | Create a new key pair |
+| `DELETE` | `/keystones/{id}` | `keystones.destroy` | Revoke a key |
+| `POST` | `/keystones/{id}/rotate` | `keystones.rotate` | Rotate a key |
+
+**Create key request body:**
+```json
+{
+    "name": "My Mobile App",
+    "scopes": ["read", "write"],
+    "expires_at": "2027-01-01",
+    "description": "Used by the iOS app"
+}
+```
+
+**Create key response:**
+```json
+{
+    "id": 42,
+    "name": "My Mobile App",
+    "client": "ks_a1b2c3...",
+    "secret": "f9e8d7...",
+    "scopes": ["read", "write"],
+    "expires_at": "2027-01-01T00:00:00.000000Z",
+    "created_at": "2026-09-10T09:00:00.000000Z"
+}
+```
+
+> The `secret` is only returned **once** on creation. Store it immediately.
+
+---
+
+
 
 ## Multi-Tenancy (stancl/tenancy v4)
 
@@ -698,10 +981,39 @@ Keystone::flushResolved();
 
 | Command | Description |
 |---|---|
+| `keystone:generate {model} {id} {name}` | Generate a new key pair for any Eloquent model owner |
+| `keystone:revoke {client}` | Immediately revoke a key by its client ID (with confirmation; `--force` to skip) |
+| `keystone:list` | List keys with status, owner, scopes, expiry (filterable by `--active`, `--revoked`, `--owner-type`, `--owner-id`) |
+| `keystone:status` | Display key counts, cache configuration, and access-log statistics |
+| `keystone:rotate-expiring` | Auto-rotate keys expiring within N days (`--days=7`, `--dry-run`) |
 | `keystone:prune` | Delete revoked keys older than `prune_revoked_after_days` and evict their cache entries |
 | `keystone:prune --days=7` | Override the retention period |
 
+**Examples:**
+
+```bash
+# Generate a key for User ID 1 with scopes
+php artisan keystone:generate "App\Models\User" 1 "CI Bot" --scope=read --scope=write
+
+# Revoke a specific key without confirmation prompt
+php artisan keystone:revoke ks_abc123... --force
+
+# List all active keys for a specific owner
+php artisan keystone:list --owner-type="App\Models\User" --owner-id=1 --active
+
+# Rotate all keys expiring in the next 14 days (preview, then run)
+php artisan keystone:rotate-expiring --days=14 --dry-run
+php artisan keystone:rotate-expiring --days=14
+
+# Prune old keys and old access logs
+php artisan keystone:prune --access-logs --log-days=90
+
+# Display system status dashboard
+php artisan keystone:status
+```
+
 ---
+
 
 ## Events & Observers
 
@@ -754,6 +1066,54 @@ $this->getJson('/api/write-resource', [
     'X-Client-Id'       => $result['client'],
     'X-API-Signature' => $sig,
 ])->assertUnauthorized();
+```
+
+### Testing Helpers
+
+Keystone provides several testing utilities to simplify your test suites:
+
+**1. KeystoneFake** — bypass the real service and mock authentication:
+
+```php
+use Schtzie\Keystone\Facades\Keystone;
+
+// Swap the real service for a fake that approves everything
+Keystone::fake();
+
+// Swap for a fake that rejects everything
+Keystone::fake(null);
+
+// Provide a specific Keystone model for the fake to resolve to
+Keystone::fake($specificKey);
+
+// Assertions
+Keystone::assertAuthenticatedTimes(2);
+Keystone::assertNotAuthenticated();
+```
+
+**2. Request Macros** — easily attach headers to a test request:
+
+```php
+use Schtzie\Keystone\Testing\KeystoneFactory;
+
+$key = KeystoneFactory::new()->create();
+
+// Attaches X-Client-Id and X-API-Signature headers for this key
+$this->actingWithKeystone($key)->getJson('/api/protected')->assertOk();
+
+// Attaches headers and forces specific scopes on the request
+$this->actingWithKeystoneScopes($key, ['write'])->postJson('/api/data')->assertOk();
+```
+
+**3. KeystoneFactory** — fluent factory for test keys:
+
+```php
+use Schtzie\Keystone\Testing\KeystoneFactory;
+
+$expiredKey = KeystoneFactory::new()->expired()->create();
+$revokedKey = KeystoneFactory::new()->revoked()->create();
+$scopedKey  = KeystoneFactory::new()->withScopes(['admin'])->create();
+$metaKey    = KeystoneFactory::new()->withMetadata(['version' => '1.0'])->create();
 ```
 
 ### Disabling the cache in tests
