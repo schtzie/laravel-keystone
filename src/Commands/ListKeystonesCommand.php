@@ -6,6 +6,7 @@ namespace Schtzie\Keystone\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
+use Schtzie\Keystone\Commands\Traits\HasTenantOption;
 use Schtzie\Keystone\Models\Keystone;
 
 /**
@@ -28,8 +29,11 @@ use Schtzie\Keystone\Models\Keystone;
  */
 final class ListKeystonesCommand extends Command
 {
+    use HasTenantOption;
+
     /** @var string */
     protected $signature = 'keystone:list
+        {--tenant= : The ID of the tenant database to execute within}
         {--owner-type=  : Filter by polymorphic owner class (e.g. "App\\Models\\User")}
         {--owner-id=    : Filter by polymorphic owner primary key}
         {--active       : Show only active (not revoked, not expired) keys}
@@ -86,7 +90,7 @@ final class ListKeystonesCommand extends Command
         $rows = $keys->map(fn (Keystone $k): array => [
             $k->id,
             $k->name,
-            mb_substr($k->client, 0, 20) . '…',
+            mb_substr($k->client, 0, 20).'…',
             "{$k->keystoneable_type}#{$k->keystoneable_id}",
             implode(', ', $k->scopes ?? []) ?: '—',
             $k->expires_at?->toDateString() ?? '∞',

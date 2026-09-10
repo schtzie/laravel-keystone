@@ -17,8 +17,8 @@ use Schtzie\Keystone\Commands\RotateExpiringSoonCommand;
 use Schtzie\Keystone\Commands\StatusKeystoneCommand;
 use Schtzie\Keystone\Commands\WarmCacheCommand;
 use Schtzie\Keystone\Contracts\KeystoneServiceContract;
-use Schtzie\Keystone\Events\KeystoneAuthFailed;
 use Schtzie\Keystone\Events\KeystoneAuthenticated;
+use Schtzie\Keystone\Events\KeystoneAuthFailed;
 use Schtzie\Keystone\Events\KeystoneRateLimitExceeded;
 use Schtzie\Keystone\Http\Middleware\AuthenticateWithKeystone;
 use Schtzie\Keystone\Http\Middleware\VerifyKeystonePayload;
@@ -47,7 +47,7 @@ final class KeystoneServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/keystone.php',
+            __DIR__.'/../config/keystone.php',
             'keystone',
         );
 
@@ -55,10 +55,10 @@ final class KeystoneServiceProvider extends ServiceProvider
         $this->app->scoped(KeystoneKeyCacheRepository::class, function (Application $app): KeystoneKeyCacheRepository {
             /** @var \Illuminate\Cache\CacheManager $cacheManager */
             $cacheManager = $app->make('cache');
-            $storeName    = config('keystone.cache.store', 'redis');
+            $storeName = config('keystone.cache.store', 'redis');
 
             $prefixConfig = config('keystone.cache.prefix', 'keystone');
-            $ttlConfig    = config('keystone.cache.ttl');
+            $ttlConfig = config('keystone.cache.ttl');
 
             return new KeystoneKeyCacheRepository(
                 cache: $cacheManager->store(is_string($storeName) ? $storeName : 'redis'),
@@ -85,8 +85,8 @@ final class KeystoneServiceProvider extends ServiceProvider
         $this->app->singleton(RateLimitStrategy::class, function (): RateLimitStrategy {
             return match (config('keystone.rate_limit_strategy', 'fixed_window')) {
                 'sliding_window' => new SlidingWindowStrategy(),
-                'token_bucket'   => new TokenBucketStrategy(),
-                default          => new FixedWindowStrategy(),
+                'token_bucket' => new TokenBucketStrategy(),
+                default => new FixedWindowStrategy(),
             };
         });
 
@@ -136,27 +136,27 @@ final class KeystoneServiceProvider extends ServiceProvider
         }
 
         $this->publishes([
-            __DIR__ . '/../config/keystone.php' => config_path('keystone.php'),
+            __DIR__.'/../config/keystone.php' => config_path('keystone.php'),
         ], 'keystone-config');
 
         $this->publishes([
-            __DIR__ . '/../database/migrations/create_keystoneables_table.php.stub' => database_path('migrations/' . date('Y_m_d_His') . '_create_keystoneables_table.php'),
+            __DIR__.'/../database/migrations/create_keystoneables_table.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_keystoneables_table.php'),
         ], 'keystone-migrations');
 
         $this->publishes([
-            __DIR__ . '/../database/migrations/create_keystoneables_table_single_db.php.stub' => database_path('migrations/' . date('Y_m_d_His') . '_create_keystoneables_table.php'),
+            __DIR__.'/../database/migrations/create_keystoneables_table_single_db.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_keystoneables_table.php'),
         ], 'keystone-migrations-single-db');
 
         $this->publishes([
-            __DIR__ . '/../database/migrations/add_keystone_enhancements.php.stub' => database_path('migrations/' . date('Y_m_d_His') . '_add_keystone_enhancements.php'),
+            __DIR__.'/../database/migrations/add_keystone_enhancements.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_add_keystone_enhancements.php'),
         ], 'keystone-migrations-enhancements');
 
         $this->publishes([
-            __DIR__ . '/../database/migrations/create_keystone_access_logs_table.php.stub' => database_path('migrations/' . date('Y_m_d_His') . '_create_keystone_access_logs_table.php'),
+            __DIR__.'/../database/migrations/create_keystone_access_logs_table.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_create_keystone_access_logs_table.php'),
         ], 'keystone-migrations-access-logs');
 
         $this->publishes([
-            __DIR__ . '/../routes/keystone.php' => base_path('routes/keystone.php'),
+            __DIR__.'/../routes/keystone.php' => base_path('routes/keystone.php'),
         ], 'keystone-routes');
     }
 
@@ -278,8 +278,8 @@ final class KeystoneServiceProvider extends ServiceProvider
     {
         $logger = KeystoneAccessLogger::class;
 
-        Event::listen(KeystoneAuthenticated::class,     [$logger, 'handleAuthenticated']);
-        Event::listen(KeystoneAuthFailed::class,        [$logger, 'handleAuthFailed']);
+        Event::listen(KeystoneAuthenticated::class, [$logger, 'handleAuthenticated']);
+        Event::listen(KeystoneAuthFailed::class, [$logger, 'handleAuthFailed']);
         Event::listen(KeystoneRateLimitExceeded::class, [$logger, 'handleRateLimitExceeded']);
     }
 
@@ -314,6 +314,6 @@ final class KeystoneServiceProvider extends ServiceProvider
             return;
         }
 
-        $this->loadRoutesFrom(__DIR__ . '/../routes/keystone.php');
+        $this->loadRoutesFrom(__DIR__.'/../routes/keystone.php');
     }
 }

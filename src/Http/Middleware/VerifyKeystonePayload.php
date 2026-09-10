@@ -54,7 +54,7 @@ final class VerifyKeystonePayload
         }
 
         $headerConfig = config('keystone.body_signing.header', 'X-Body-Hash');
-        $header       = is_string($headerConfig) ? $headerConfig : 'X-Body-Hash';
+        $header = is_string($headerConfig) ? $headerConfig : 'X-Body-Hash';
         $providedHash = $request->header($header);
 
         $body = (string) $request->getContent();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Schtzie\Keystone\Facades;
 
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Facade;
 use Schtzie\Keystone\Contracts\KeystoneServiceContract;
@@ -40,15 +41,18 @@ use Schtzie\Keystone\Testing\KeystoneFake;
 final class Keystone extends Facade
 {
     /**
-     * Return the container binding key for the underlying authentication service.
-     *
-     * We resolve through the contract interface rather than the concrete class so
-     * that `Keystone::fake()` can swap in a test double — the container returns
-     * the fake, and the facade (and middleware) both pick it up transparently.
+     * A closure that physically switches the database connection to the given tenant ID.
+     * Registered by the host application in their AppServiceProvider.
      */
-    protected static function getFacadeAccessor(): string
+    public static ?Closure $tenantResolver = null;
+
+    /**
+     * Register a callback to initialize the tenant context.
+     * Required if you want to use the `--tenant=` option on Keystone Artisan commands.
+     */
+    public static function initializeTenantUsing(Closure $callback): void
     {
-        return KeystoneServiceContract::class;
+        self::$tenantResolver = $callback;
     }
 
     /**
@@ -64,7 +68,7 @@ final class Keystone extends Facade
      * `resolve()` call return null (simulating a failed authentication → 401).
      *
      * @param  KeystoneModel|null  $stubbedKey  The key the fake will return from resolve().
-     *                                     null = all auth attempts fail.
+     *                                          null = all auth attempts fail.
      */
     public static function fake(?KeystoneModel $stubbedKey = null): KeystoneFake
     {
@@ -72,10 +76,22 @@ final class Keystone extends Facade
 
         // Replace both the contract and concrete bindings so every injection
         // path (middleware, direct container resolution, facade) uses the fake
-        static::swap($fake);
-        app()->instance(KeystoneService::class,         $fake);
+        self::swap($fake);
+        app()->instance(KeystoneService::class, $fake);
         app()->instance(KeystoneServiceContract::class, $fake);
 
         return $fake;
+    }
+
+    /**
+     * Return the container binding key for the underlying authentication service.
+     *
+     * We resolve through the contract interface rather than the concrete class so
+     * that `Keystone::fake()` can swap in a test double — the container returns
+     * the fake, and the facade (and middleware) both pick it up transparently.
+     */
+    protected static function getFacadeAccessor(): string
+    {
+        return KeystoneServiceContract::class;
     }
 }

@@ -6,7 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ## [2.3.0] — 2026-09-10
 
+### Fixed
+- **Scope Resolution Fallback**: Fixed a bug where passing an explicit empty array `[]` to `createKeystone` would incorrectly fall back to the `keystone.default_scopes` config. Explicit empty arrays now correctly override defaults, storing zero scopes.
+
+### Security
+- **Cross-tenant Object Manipulation**: Hardened `HasKeystones` against cross-tenant vulnerabilities. Added strict ownership validation (`$model->keystoneable_id !== $this->getKey()`) to `revokeKeystone()` and `rotateKeystone()` to prevent users from revoking keys that belong to other tenants.
+
 ### Added
+
+#### Multi-DB Tenancy CLI Support
+- **Multi-DB Tenancy CLI Support**: Added a `--tenant=` option to all 7 Keystone Artisan commands (`keystone:generate`, `keystone:list`, `keystone:prune`, `keystone:revoke`, `keystone:rotate-expiring`, `keystone:status`, `keystone:warm`).
+- **Tenant Context Switching**: Added `Keystone::initializeTenantUsing(Closure)` static registry to allow host applications to define how connection swapping occurs when using the `--tenant` option.
+
+#### Negative Testing Helpers
+- **Negative Testing Helpers**: Added `KeystoneFake::assertAuthenticatedTimes` and `KeystoneFake::assertNotAuthenticated` failure exception validations for more robust testing.
 
 #### Security — Replay-Attack Protection
 - **Timestamp-based replay detection**: Optional `X-Timestamp` header validation in `KeystoneService`. When `keystone.replay_protection.enabled = true`, every request must include a Unix timestamp; requests where `|now − timestamp|` exceeds the configurable `window_seconds` (default: 30 s) are rejected before any cache or database lookup occurs.

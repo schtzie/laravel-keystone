@@ -7,6 +7,8 @@ namespace Schtzie\Keystone\Commands;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
+use Schtzie\Keystone\Commands\Traits\HasTenantOption;
+use Throwable;
 
 /**
  * Artisan command to generate a new API key pair for any Eloquent model owner.
@@ -27,8 +29,11 @@ use Illuminate\Database\Eloquent\Model;
  */
 final class GenerateKeystoneCommand extends Command
 {
+    use HasTenantOption;
+
     /** @var string */
     protected $signature = 'keystone:generate
+        {--tenant= : The ID of the tenant database to execute within}
         {model    : Fully-qualified model class (e.g. "App\\Models\\User")}
         {id       : Primary key of the owner record}
         {name     : Human-readable label for the new API key}
@@ -59,7 +64,7 @@ final class GenerateKeystoneCommand extends Command
 
         if ($owner === null) {
             $idArg = $this->argument('id');
-            $this->error("No [{$modelClass}] record found with ID [" . (is_scalar($idArg) ? (string) $idArg : 'unknown') . "].");
+            $this->error("No [{$modelClass}] record found with ID [".(is_scalar($idArg) ? (string) $idArg : 'unknown').'].');
 
             return self::FAILURE;
         }
@@ -75,8 +80,8 @@ final class GenerateKeystoneCommand extends Command
         if ($this->option('expires')) {
             try {
                 $expiresOpt = $this->option('expires');
-                $expiresAt  = CarbonImmutable::parse(is_string($expiresOpt) ? $expiresOpt : null);
-            } catch (\Throwable) {
+                $expiresAt = CarbonImmutable::parse(is_string($expiresOpt) ? $expiresOpt : null);
+            } catch (Throwable) {
                 $this->error('Invalid --expires format. Use Y-m-d or "Y-m-d H:i:s".');
 
                 return self::FAILURE;

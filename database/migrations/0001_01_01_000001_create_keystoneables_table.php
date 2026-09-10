@@ -23,7 +23,7 @@ return new class extends Migration
             $table->json('ip_blocklist')->nullable();
             $table->integer('rate_limit')->nullable();
             $table->json('metadata')->nullable();
-            $table->timestamp('expires_at')->nullable();
+            $table->timestamp('expires_at')->nullable()->index('keystoneables_expires_at_index');
             $table->timestamp('grace_expires_at')->nullable();
             $table->timestamp('revoked_at')->nullable()->index('keystoneables_revoked_at_index');
             $table->timestamps();

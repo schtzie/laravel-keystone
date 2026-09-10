@@ -14,7 +14,7 @@ function setupPayloadRoute(): void
 function authHeaders(string $client, string $secret): array
 {
     return [
-        'X-Client-Id'    => $client,
+        'X-Client-Id' => $client,
         'X-API-Signature' => hash_hmac('sha256', $client, $secret),
     ];
 }
@@ -22,7 +22,7 @@ function authHeaders(string $client, string $secret): array
 it('allows a request with a valid body hash', function (): void {
     setupPayloadRoute();
 
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App');
 
     $body = json_encode(['order_id' => 123]);
@@ -37,7 +37,7 @@ it('allows a request with a valid body hash', function (): void {
 it('rejects a request with a mismatched body hash', function (): void {
     setupPayloadRoute();
 
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App');
 
     $this->postJson('/test-payload', ['order_id' => 123], array_merge(
@@ -51,7 +51,7 @@ it('rejects a request with a missing body hash header', function (): void {
 
     config(['keystone.body_signing.require_on_empty' => true]);
 
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App');
 
     $this->postJson('/test-payload', ['order_id' => 123], authHeaders($result['client'], $result['secret'])
@@ -63,7 +63,7 @@ it('passes empty body requests when require_on_empty is false', function (): voi
 
     Route::middleware(['api.key', 'api.key.payload'])->get('/test-payload-empty', fn () => response()->json(['ok' => true]));
 
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App');
 
     // No X-Body-Hash header provided — should still pass because require_on_empty is false
@@ -74,3 +74,30 @@ it('passes empty body requests when require_on_empty is false', function (): voi
     ))->assertOk();
 });
 
+it('returns 500 if the payload middleware is run without the api.key middleware first', function (): void {
+    // We bind the payload middleware standalone WITHOUT the core api.key middleware
+    Route::middleware(['api.key.payload'])->post('/test-payload-error', fn () => response()->json(['ok' => true]));
+
+    $this->postJson('/test-payload-error', ['order_id' => 123])
+        ->assertStatus(500)
+        ->assertJson(['message' => 'Payload verification requires the api.key middleware to run first.']);
+});
+
+it('allows an empty body when require_on_empty is true if the client correctly hashes an empty string', function (): void {
+    setupPayloadRoute();
+
+    config(['keystone.body_signing.require_on_empty' => true]);
+
+    $user = User::create(['name' => 'Test']);
+    $result = $user->createKeystone('My App');
+
+    // The body is empty string
+    $body = '';
+    $hash = hash_hmac('sha256', $body, $result['secret']);
+
+    $this->call('POST', '/test-payload', [], [], [], array_merge(
+        ['HTTP_X-Client-Id' => $result['client']],
+        ['HTTP_X-API-Signature' => hash_hmac('sha256', $result['client'], $result['secret'])],
+        ['HTTP_X-Body-Hash' => $hash]
+    ))->assertOk();
+});

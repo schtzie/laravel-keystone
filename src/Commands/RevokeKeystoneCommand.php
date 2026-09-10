@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Schtzie\Keystone\Commands;
 
 use Illuminate\Console\Command;
+use Schtzie\Keystone\Commands\Traits\HasTenantOption;
 use Schtzie\Keystone\Models\Keystone;
 
 /**
@@ -23,8 +24,11 @@ use Schtzie\Keystone\Models\Keystone;
  */
 final class RevokeKeystoneCommand extends Command
 {
+    use HasTenantOption;
+
     /** @var string */
     protected $signature = 'keystone:revoke
+        {--tenant= : The ID of the tenant database to execute within}
         {client : The plain client identifier of the key to revoke (e.g. ks_abc123…)}
         {--force : Skip the confirmation prompt}';
 

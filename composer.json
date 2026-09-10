@@ -42,7 +42,8 @@
         "orchestra/testbench": "^9.0|^10.8|^11.0",
         "pestphp/pest": "^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0",
-        "predis/predis": "^3.6"
+        "predis/predis": "^3.6",
+        "stancl/tenancy": "dev-master"
     },
     "autoload": {
         "psr-4": {
@@ -60,7 +61,12 @@
         "test-coverage": "pest --coverage",
         "analyse": "phpstan analyse --memory-limit=-1",
         "analyse-baseline": "phpstan analyse --memory-limit=-1 --generate-baseline",
-        "pint": "vendor/bin/pint"
+        "pint": "vendor/bin/pint",
+        "check": [
+            "@pint",
+            "@analyse",
+            "@test"
+        ]
     },
     "extra": {
         "laravel": {
@@ -79,6 +85,6 @@
         },
         "sort-packages": true
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true
 }

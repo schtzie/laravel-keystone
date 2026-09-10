@@ -6,11 +6,12 @@ namespace Schtzie\Keystone\Logging;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Schtzie\Keystone\Events\KeystoneAuthFailed;
 use Schtzie\Keystone\Events\KeystoneAuthenticated;
+use Schtzie\Keystone\Events\KeystoneAuthFailed;
 use Schtzie\Keystone\Events\KeystoneRateLimitExceeded;
 use Schtzie\Keystone\Models\Keystone;
 use Schtzie\Keystone\Models\KeystoneAccessLog;
+use Throwable;
 
 /**
  * Listens to Keystone authentication events and writes structured access log
@@ -109,7 +110,7 @@ final class KeystoneAccessLogger
     {
         try {
             $payload = $this->buildPayload($keystone, $request, $event, $statusCode);
-            $driver  = config('keystone.access_log.driver', 'database');
+            $driver = config('keystone.access_log.driver', 'database');
 
             if ($driver === 'database' || $driver === 'both') {
                 $this->writeToDatabase($payload);
@@ -118,7 +119,7 @@ final class KeystoneAccessLogger
             if ($driver === 'log' || $driver === 'both') {
                 $this->writeToLogChannel($event, $payload);
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Access logging must never interrupt the request lifecycle.
         }
     }
@@ -142,16 +143,16 @@ final class KeystoneAccessLogger
         }
 
         return [
-            'keystone_id'       => $keystone?->id,
+            'keystone_id' => $keystone?->id,
             'keystoneable_type' => $keystone?->keystoneable_type,
-            'keystoneable_id'   => $keystone?->keystoneable_id,
-            'tenant_id'         => $tenantSegment !== '' ? $tenantSegment : null,
-            'ip_address'        => $request->ip(),
-            'method'            => $request->method(),
-            'path'              => $request->path(),
-            'scopes_used'       => $keystone?->scopes,
-            'status_code'       => $statusCode,
-            'event'             => $event,
+            'keystoneable_id' => $keystone?->keystoneable_id,
+            'tenant_id' => $tenantSegment !== '' ? $tenantSegment : null,
+            'ip_address' => $request->ip(),
+            'method' => $request->method(),
+            'path' => $request->path(),
+            'scopes_used' => $keystone?->scopes,
+            'status_code' => $statusCode,
+            'event' => $event,
         ];
     }
 
@@ -174,7 +175,7 @@ final class KeystoneAccessLogger
     {
         $channel = config('keystone.access_log.channel');
         /** @var \Psr\Log\LoggerInterface $logger */
-        $logger  = is_string($channel) ? Log::channel($channel) : Log::getFacadeRoot();
+        $logger = is_string($channel) ? Log::channel($channel) : Log::getFacadeRoot();
 
         $logger->info("keystone.{$event}", $payload);
     }
@@ -186,9 +187,9 @@ final class KeystoneAccessLogger
     {
         return match ($reason) {
             'ip_not_allowed', 'ip_blocked' => 'rejected_ip',
-            'insufficient_scope'           => 'rejected_scope',
-            'replay_detected'              => 'rejected_replay',
-            default                        => 'rejected_invalid',
+            'insufficient_scope' => 'rejected_scope',
+            'replay_detected' => 'rejected_replay',
+            default => 'rejected_invalid',
         };
     }
 }

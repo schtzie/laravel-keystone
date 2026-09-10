@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Schtzie\Keystone\Testing;
 
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Schtzie\Keystone\Models\Keystone;
 
@@ -51,6 +52,14 @@ final class KeystoneFactory
     /** @var array<string, mixed> */
     private array $metadata = [];
 
+    /** @var array<int, string>|null */
+    private ?array $ipAllowlist = null;
+
+    /** @var array<int, string>|null */
+    private ?array $ipBlocklist = null;
+
+    private ?int $rateLimit = null;
+
     private function __construct(private readonly Model $owner) {}
 
     /**
@@ -59,7 +68,7 @@ final class KeystoneFactory
      */
     public static function for(Model $owner): static
     {
-        return new static($owner);
+        return new self($owner);
     }
 
     /**
@@ -91,7 +100,7 @@ final class KeystoneFactory
      * Set a specific expiry timestamp on the key.
      * Pass a future timestamp to create a key that is still valid but will expire.
      */
-    public function expiringAt(CarbonImmutable|\DateTimeInterface $expiresAt): static
+    public function expiringAt(CarbonImmutable|DateTimeInterface $expiresAt): static
     {
         $clone = clone $this;
         $clone->expiresAt = $expiresAt instanceof CarbonImmutable
@@ -138,6 +147,43 @@ final class KeystoneFactory
     }
 
     /**
+     * Restrict the key to specific IPs or CIDR blocks.
+     *
+     * @param  array<int, string>  $ips
+     */
+    public function withIpAllowlist(array $ips): static
+    {
+        $clone = clone $this;
+        $clone->ipAllowlist = $ips;
+
+        return $clone;
+    }
+
+    /**
+     * Block specific IPs or CIDR blocks from using this key.
+     *
+     * @param  array<int, string>  $ips
+     */
+    public function withIpBlocklist(array $ips): static
+    {
+        $clone = clone $this;
+        $clone->ipBlocklist = $ips;
+
+        return $clone;
+    }
+
+    /**
+     * Override the global rate limit for this specific key.
+     */
+    public function withRateLimit(int $limit): static
+    {
+        $clone = clone $this;
+        $clone->rateLimit = $limit;
+
+        return $clone;
+    }
+
+    /**
      * Persist the Keystone to the database and return the credential array.
      *
      * Revocation and other state mutations are applied after the initial insert
@@ -155,6 +201,18 @@ final class KeystoneFactory
 
         if ($this->metadata !== []) {
             $options['metadata'] = $this->metadata;
+        }
+
+        if ($this->ipAllowlist !== null) {
+            $options['ip_allowlist'] = $this->ipAllowlist;
+        }
+
+        if ($this->ipBlocklist !== null) {
+            $options['ip_blocklist'] = $this->ipBlocklist;
+        }
+
+        if ($this->rateLimit !== null) {
+            $options['rate_limit'] = $this->rateLimit;
         }
 
         /** @var array{client: string, secret: string, model: Keystone} $result */

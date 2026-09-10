@@ -83,17 +83,17 @@ class KeystoneController extends Controller
         try {
             /** @var array<string, mixed> $validated */
             $validated = $request->validate([
-                'name'           => 'required|string|max:255',
-                'scopes'         => 'sometimes|array',
-                'scopes.*'       => 'string|max:100',
-                'expires_at'     => 'sometimes|nullable|date|after:now',
-                'description'    => 'sometimes|nullable|string|max:1000',
-                'metadata'       => 'sometimes|nullable|array',
-                'ip_allowlist'   => 'sometimes|nullable|array',
+                'name' => 'required|string|max:255',
+                'scopes' => 'sometimes|array',
+                'scopes.*' => 'string|max:100',
+                'expires_at' => 'sometimes|nullable|date|after:now',
+                'description' => 'sometimes|nullable|string|max:1000',
+                'metadata' => 'sometimes|nullable|array',
+                'ip_allowlist' => 'sometimes|nullable|array',
                 'ip_allowlist.*' => 'string|max:45',
-                'ip_blocklist'   => 'sometimes|nullable|array',
+                'ip_blocklist' => 'sometimes|nullable|array',
                 'ip_blocklist.*' => 'string|max:45',
-                'rate_limit'     => 'sometimes|nullable|integer|min:0',
+                'rate_limit' => 'sometimes|nullable|integer|min:0',
             ]);
         } catch (ValidationException $e) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
@@ -105,16 +105,16 @@ class KeystoneController extends Controller
             : null;
 
         $options = array_filter([
-            'description'  => $validated['description'] ?? null,
-            'metadata'     => $validated['metadata'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'metadata' => $validated['metadata'] ?? null,
             'ip_allowlist' => $validated['ip_allowlist'] ?? null,
             'ip_blocklist' => $validated['ip_blocklist'] ?? null,
-            'rate_limit'   => $validated['rate_limit'] ?? null,
+            'rate_limit' => $validated['rate_limit'] ?? null,
         ], fn ($v) => $v !== null);
 
         $nameRaw = $validated['name'] ?? '';
         $nameStr = is_scalar($nameRaw) ? (string) $nameRaw : '';
-        
+
         /** @var array{client: string, secret: string, model: Keystone} $result */
         $result = $owner->createKeystone( // @phpstan-ignore-line
             name: $nameStr,
@@ -126,12 +126,12 @@ class KeystoneController extends Controller
 
         return response()->json([
             'message' => 'API key created. Store the secret — it will not be shown again.',
-            'data'    => [
-                'id'         => $result['model']->id,
-                'name'       => $result['model']->name,
-                'client'     => $result['client'],
-                'secret'     => $result['secret'],
-                'scopes'     => $result['model']->scopes,
+            'data' => [
+                'id' => $result['model']->id,
+                'name' => $result['model']->name,
+                'client' => $result['client'],
+                'secret' => $result['secret'],
+                'scopes' => $result['model']->scopes,
                 'expires_at' => $result['model']->expires_at?->toIso8601String(),
                 'created_at' => $result['model']->created_at->toIso8601String(),
             ],
@@ -195,12 +195,12 @@ class KeystoneController extends Controller
 
         return response()->json([
             'message' => 'API key rotated. Store the new secret — it will not be shown again.',
-            'data'    => [
-                'id'         => $result['model']->id,
-                'name'       => $result['model']->name,
-                'client'     => $result['client'],
-                'secret'     => $result['secret'],
-                'scopes'     => $result['model']->scopes,
+            'data' => [
+                'id' => $result['model']->id,
+                'name' => $result['model']->name,
+                'client' => $result['client'],
+                'secret' => $result['secret'],
+                'scopes' => $result['model']->scopes,
                 'expires_at' => $result['model']->expires_at?->toIso8601String(),
                 'created_at' => $result['model']->created_at->toIso8601String(),
             ],

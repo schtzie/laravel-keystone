@@ -74,13 +74,13 @@ final class KeystoneService implements KeystoneServiceContract
     {
         // ── 1. Extract client ID ──────────────────────────────────────────────
         $headerNameConfig = config('keystone.header', 'X-Client-Id');
-        $headerName       = is_string($headerNameConfig) ? $headerNameConfig : 'X-Client-Id';
-        $rawKey           = $request->header($headerName);
+        $headerName = is_string($headerNameConfig) ? $headerNameConfig : 'X-Client-Id';
+        $rawKey = $request->header($headerName);
 
         if (! is_string($rawKey) || $rawKey === '') {
             $queryNameConfig = config('keystone.query_param', 'client');
-            $queryName       = is_string($queryNameConfig) ? $queryNameConfig : 'client';
-            $rawKey          = $request->query($queryName);
+            $queryName = is_string($queryNameConfig) ? $queryNameConfig : 'client';
+            $rawKey = $request->query($queryName);
         }
 
         if (! is_string($rawKey) || $rawKey === '') {
@@ -89,13 +89,13 @@ final class KeystoneService implements KeystoneServiceContract
 
         // ── 2. Extract HMAC signature ─────────────────────────────────────────
         $sigHeaderConfig = config('keystone.signature_header', 'X-API-Signature');
-        $sigHeader       = is_string($sigHeaderConfig) ? $sigHeaderConfig : 'X-API-Signature';
-        $signature       = $request->header($sigHeader);
+        $sigHeader = is_string($sigHeaderConfig) ? $sigHeaderConfig : 'X-API-Signature';
+        $signature = $request->header($sigHeader);
 
         if (! is_string($signature) || $signature === '') {
             $sigQueryConfig = config('keystone.signature_query_param', 'signature');
-            $sigQuery       = is_string($sigQueryConfig) ? $sigQueryConfig : 'signature';
-            $signature      = $request->query($sigQuery);
+            $sigQuery = is_string($sigQueryConfig) ? $sigQueryConfig : 'signature';
+            $signature = $request->query($sigQuery);
         }
 
         if (! is_string($signature) || $signature === '') {
@@ -105,8 +105,8 @@ final class KeystoneService implements KeystoneServiceContract
         // ── 3. Optional replay-attack prevention ──────────────────────────────
         if (config('keystone.replay_protection.enabled', false)) {
             $tsHeaderConfig = config('keystone.replay_protection.timestamp_header', 'X-Timestamp');
-            $tsHeader       = is_string($tsHeaderConfig) ? $tsHeaderConfig : 'X-Timestamp';
-            $timestamp      = $request->header($tsHeader);
+            $tsHeader = is_string($tsHeaderConfig) ? $tsHeaderConfig : 'X-Timestamp';
+            $timestamp = $request->header($tsHeader);
 
             if (! is_string($timestamp) || ! is_numeric($timestamp)) {
                 return null; // Timestamp missing or non-numeric — reject
@@ -160,7 +160,7 @@ final class KeystoneService implements KeystoneServiceContract
         if ($client === null) {
             /** @var class-string<Keystone> $modelClass */
             $modelClass = config('keystone.model', Keystone::class);
-            $client     = $modelClass::where('client', $rawKey)->first();
+            $client = $modelClass::where('client', $rawKey)->first();
 
             if ($client !== null && config('keystone.cache.warm_on_miss', true)) {
                 $this->cache->put($client);

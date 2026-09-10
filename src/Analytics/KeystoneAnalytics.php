@@ -6,7 +6,6 @@ namespace Schtzie\Keystone\Analytics;
 
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use Schtzie\Keystone\Models\Keystone;
 use Schtzie\Keystone\Models\KeystoneAccessLog;
 

@@ -96,14 +96,14 @@ LUA;
         }
 
         $rate = $limit / max(1, $windowSeconds); // tokens per second
-        $now  = microtime(true);
+        $now = microtime(true);
 
         /** @var array<int, int>|mixed $result */
         $result = $connection->command('eval', [
             self::LUA_SCRIPT,
             2,
-            $key . ':tokens',
-            $key . ':ts',
+            $key.':tokens',
+            $key.':ts',
             (string) $rate,
             (string) $limit,
             (string) $now,
@@ -125,19 +125,19 @@ LUA;
             return (new FixedWindowStrategy())->remaining($key, $limit, $windowSeconds);
         }
 
-        $rate      = $limit / max(1, $windowSeconds);
-        $now       = microtime(true);
-        $rawTokens = $connection->get($key . ':tokens');
-        $rawTs     = $connection->get($key . ':ts');
+        $rate = $limit / max(1, $windowSeconds);
+        $now = microtime(true);
+        $rawTokens = $connection->get($key.':tokens');
+        $rawTs = $connection->get($key.':ts');
 
         if ($rawTokens === null) {
             return $limit; // Fresh bucket — fully loaded
         }
 
-        $lastTs     = is_numeric($rawTs) ? (float) $rawTs : $now;
-        $delta      = max(0.0, $now - $lastTs);
-        $rawTksFlt  = is_numeric($rawTokens) ? (float) $rawTokens : (float) $limit;
-        $filled     = min((float) $limit, $rawTksFlt + $delta * $rate);
+        $lastTs = is_numeric($rawTs) ? (float) $rawTs : $now;
+        $delta = max(0.0, $now - $lastTs);
+        $rawTksFlt = is_numeric($rawTokens) ? (float) $rawTokens : (float) $limit;
+        $filled = min((float) $limit, $rawTksFlt + $delta * $rate);
 
         return max(0, (int) floor($filled));
     }
@@ -156,19 +156,19 @@ LUA;
             return max(0, RateLimiter::availableIn($key));
         }
 
-        $rawTokens = $connection->get($key . ':tokens');
-        $rawTs     = $connection->get($key . ':ts');
+        $rawTokens = $connection->get($key.':tokens');
+        $rawTs = $connection->get($key.':ts');
 
         if ($rawTokens === null || (is_numeric($rawTokens) && (float) $rawTokens >= 1)) {
             return 0;
         }
 
         // We need (1 - current_tokens) / rate seconds for one token to refill
-        $windowConfig  = config('keystone.rate_limit_window_seconds', 60);
+        $windowConfig = config('keystone.rate_limit_window_seconds', 60);
         $windowSeconds = is_numeric($windowConfig) ? (int) $windowConfig : 60;
-        $limitConfig   = config('keystone.rate_limit', 60);
-        $limit         = is_numeric($limitConfig) ? (int) $limitConfig : 60;
-        $rate          = $limit / max(1, $windowSeconds);
+        $limitConfig = config('keystone.rate_limit', 60);
+        $limit = is_numeric($limitConfig) ? (int) $limitConfig : 60;
+        $rate = $limit / max(1, $windowSeconds);
 
         $rawTksFlt = is_numeric($rawTokens) ? (float) $rawTokens : 0.0;
         $deficit = max(0.0, 1.0 - $rawTksFlt);
@@ -185,9 +185,9 @@ LUA;
     private function redisConnection(): mixed
     {
         $storeConfig = config('keystone.cache.store', 'redis');
-        $storeName   = is_string($storeConfig) ? $storeConfig : 'redis';
-        $store       = app('cache')->store($storeName);
-        $inner       = ($store instanceof Repository) ? $store->getStore() : null;
+        $storeName = is_string($storeConfig) ? $storeConfig : 'redis';
+        $store = app('cache')->store($storeName);
+        $inner = ($store instanceof Repository) ? $store->getStore() : null;
 
         if (! ($inner instanceof RedisStore)) {
             return null;

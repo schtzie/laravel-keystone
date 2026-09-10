@@ -7,10 +7,11 @@ namespace Schtzie\Keystone\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
 use Schtzie\Keystone\Contracts\KeystoneServiceContract;
-use Schtzie\Keystone\Events\KeystoneAuthFailed;
 use Schtzie\Keystone\Events\KeystoneAuthenticated;
+use Schtzie\Keystone\Events\KeystoneAuthFailed;
 use Schtzie\Keystone\Events\KeystoneRateLimitExceeded;
 use Schtzie\Keystone\Models\Keystone;
 use Schtzie\Keystone\RateLimiting\Contracts\RateLimitStrategy;
@@ -128,14 +129,14 @@ final class AuthenticateWithKeystone
 
         // ── Step 3: Per-minute rate limiting ───────────────────────────────────
         $tenantSegment = $this->cache->tenantSegment();
-        $configWindow  = config('keystone.rate_limit_window_seconds', 60);
+        $configWindow = config('keystone.rate_limit_window_seconds', 60);
         $windowSeconds = is_numeric($configWindow) ? (int) $configWindow : 60;
 
         $effectiveLimit = $this->resolveEffectiveRateLimit($client);
-        $limitKey       = null;
+        $limitKey = null;
 
         if ($effectiveLimit > 0) {
-            $limitKey = 'keystone:rate_limit:' . $tenantSegment . $client->id;
+            $limitKey = 'keystone:rate_limit:'.$tenantSegment.$client->id;
 
             if (! $this->rateLimitStrategy->attempt($limitKey, $effectiveLimit, $windowSeconds)) {
                 $retryAfter = $this->rateLimitStrategy->retryAfter($limitKey);
@@ -150,7 +151,7 @@ final class AuthenticateWithKeystone
         $dailyLimit = $this->resolveDaily($client);
 
         if ($dailyLimit > 0) {
-            $dailyKey = 'keystone:rate_limit_daily:' . $tenantSegment . $client->id;
+            $dailyKey = 'keystone:rate_limit_daily:'.$tenantSegment.$client->id;
 
             if (! $this->rateLimitStrategy->attempt($dailyKey, $dailyLimit, 86400)) {
                 $retryAfter = $this->rateLimitStrategy->retryAfter($dailyKey);
@@ -201,7 +202,7 @@ final class AuthenticateWithKeystone
                     if ($guardStr !== '') {
                         try {
                             Auth::guard($guardStr)->setUser($owner);
-                        } catch (\InvalidArgumentException) {
+                        } catch (InvalidArgumentException) {
                             // Guard does not exist — ignore and continue
                         }
                     }
@@ -220,7 +221,7 @@ final class AuthenticateWithKeystone
 
         // Append rate-limit headers to the outgoing response
         if ($limitKey !== null) {
-            $response->headers->set('X-Keystone-RateLimit-Limit',     (string) $effectiveLimit);
+            $response->headers->set('X-Keystone-RateLimit-Limit', (string) $effectiveLimit);
             $response->headers->set('X-Keystone-RateLimit-Remaining', (string) $this->rateLimitStrategy->remaining($limitKey, $effectiveLimit, $windowSeconds));
         }
 
@@ -259,7 +260,7 @@ final class AuthenticateWithKeystone
     private function resolveEffectiveRateLimit(Keystone $client): int
     {
         $globalLimit = config('keystone.rate_limit');
-        $keyLimit    = $client->rate_limit ?? (is_numeric($globalLimit) ? (int) $globalLimit : 0);
+        $keyLimit = $client->rate_limit ?? (is_numeric($globalLimit) ? (int) $globalLimit : 0);
 
         // Apply scope-based rate limit overrides (config: keystone.scopes_rate_limits)
         $scopeLimits = config('keystone.scopes_rate_limits', []);
@@ -309,10 +310,10 @@ final class AuthenticateWithKeystone
     private function tooManyRequests(string $limitKey, int $limit, int $retryAfter): Response
     {
         return response()->json(['message' => 'Too many requests.'], 429, [
-            'Retry-After'                    => (string) $retryAfter,
-            'X-Keystone-RateLimit-Limit'     => (string) $limit,
+            'Retry-After' => (string) $retryAfter,
+            'X-Keystone-RateLimit-Limit' => (string) $limit,
             'X-Keystone-RateLimit-Remaining' => '0',
-            'X-Keystone-RateLimit-Reset'     => (string) (time() + $retryAfter),
+            'X-Keystone-RateLimit-Reset' => (string) (time() + $retryAfter),
         ]);
     }
 }

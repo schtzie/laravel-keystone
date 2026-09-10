@@ -7,7 +7,7 @@ use Schtzie\Keystone\Tests\Fixtures\User;
 // ── API key UX features: metadata, description, max_keys_per_owner ─────────
 
 it('stores metadata on a created key', function (): void {
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App', [], null, [
         'metadata' => ['env' => 'prod', 'team' => 'backend'],
     ]);
@@ -17,7 +17,7 @@ it('stores metadata on a created key', function (): void {
 });
 
 it('stores description on a created key', function (): void {
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App', [], null, [
         'description' => 'Used by the nightly CI pipeline',
     ]);
@@ -32,7 +32,7 @@ it('enforces max_keys_per_owner when configured', function (): void {
     $user->createKeystone('Key 1');
     $user->createKeystone('Key 2');
 
-    expect(fn () => $user->createKeystone('Key 3'))->toThrow(\RuntimeException::class);
+    expect(fn () => $user->createKeystone('Key 3'))->toThrow(RuntimeException::class);
 });
 
 it('does not enforce max_keys_per_owner when set to null', function (): void {
@@ -47,23 +47,32 @@ it('does not enforce max_keys_per_owner when set to null', function (): void {
     expect($user->keystones()->count())->toBe(5);
 });
 
-it('rotation inherits metadata from the old key', function (): void {
-    $user   = User::create(['name' => 'Test']);
+it('rotation perfectly inherits all options and metadata from the old key', function (): void {
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App', [], null, [
         'metadata' => ['env' => 'staging'],
+        'description' => 'Test Description',
+        'rate_limit' => 100,
+        'ip_allowlist' => ['127.0.0.1'],
+        'ip_blocklist' => ['192.168.1.1'],
     ]);
 
     $rotated = $user->rotateKeystone($result['model']);
+    $newKey = $rotated['model'];
 
-    expect($rotated['model']->metadata)->toBe(['env' => 'staging']); // @phpstan-ignore-line
+    expect($newKey->metadata)->toBe(['env' => 'staging']); // @phpstan-ignore-line
+    expect($newKey->description)->toBe('Test Description'); // @phpstan-ignore-line
+    expect($newKey->rate_limit)->toBe(100);
+    expect($newKey->ip_allowlist)->toBe(['127.0.0.1']);
+    expect($newKey->ip_blocklist)->toBe(['192.168.1.1']);
 });
 
 it('scopeActive excludes grace-period keys', function (): void {
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My App');
 
     $result['model']->update([
-        'revoked_at'       => now(),
+        'revoked_at' => now(),
         'grace_expires_at' => now()->addMinutes(5),
     ]);
 

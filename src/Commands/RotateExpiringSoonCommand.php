@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Schtzie\Keystone\Commands;
 
 use Illuminate\Console\Command;
+use Schtzie\Keystone\Commands\Traits\HasTenantOption;
 use Schtzie\Keystone\Models\Keystone;
+use Throwable;
 
 /**
  * Artisan command to proactively rotate API keys that are approaching expiry.
@@ -30,8 +32,11 @@ use Schtzie\Keystone\Models\Keystone;
  */
 final class RotateExpiringSoonCommand extends Command
 {
+    use HasTenantOption;
+
     /** @var string */
     protected $signature = 'keystone:rotate-expiring
+        {--tenant= : The ID of the tenant database to execute within}
         {--days=7    : Rotate keys expiring within this many days}
         {--dry-run   : Preview which keys would be rotated without making changes}';
 
@@ -47,10 +52,10 @@ final class RotateExpiringSoonCommand extends Command
         /** @var class-string<Keystone> $modelClass */
         $modelClass = config('keystone.model', Keystone::class);
 
-        $days     = max(1, (int) ($this->option('days') ?? 7));
-        $dryRun   = (bool) $this->option('dry-run');
-        $cutoff   = now()->addDays($days);
-        $rotated  = 0;
+        $days = max(1, (int) ($this->option('days') ?? 7));
+        $dryRun = (bool) $this->option('dry-run');
+        $cutoff = now()->addDays($days);
+        $rotated = 0;
 
         $keys = $modelClass::whereNull('revoked_at')
             ->whereNotNull('expires_at')
@@ -73,7 +78,7 @@ final class RotateExpiringSoonCommand extends Command
         $rows = $keys->map(fn (Keystone $k): array => [
             $k->id,
             $k->name,
-            mb_substr($k->client, 0, 20) . '…',
+            mb_substr($k->client, 0, 20).'…',
             "{$k->keystoneable_type}#{$k->keystoneable_id}",
             $k->expires_at?->toDateTimeString() ?? '—',
         ])->all();
@@ -93,6 +98,7 @@ final class RotateExpiringSoonCommand extends Command
 
                 if ($owner === null || ! method_exists($owner, 'rotateKeystone')) {
                     $this->warn("  Skipping key #{$key->id} — owner not found or lacks HasKeystones.");
+
                     continue;
                 }
 
@@ -101,7 +107,7 @@ final class RotateExpiringSoonCommand extends Command
 
                 $this->line("  <fg=green>✓</> Key #{$key->id} → New key #{$newResult['model']->id}");
                 $rotated++;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $this->error("  Failed to rotate key #{$key->id}: {$e->getMessage()}");
             }
         }

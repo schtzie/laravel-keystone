@@ -12,13 +12,13 @@ beforeEach(function (): void {
     // Register the REST routes directly (bypassing keystone.routes.enabled toggle)
     $prefix = 'keystone';
 
-    \Illuminate\Support\Facades\Route::prefix($prefix)
+    Illuminate\Support\Facades\Route::prefix($prefix)
         ->name('keystones.')
         ->group(function (): void {
-            \Illuminate\Support\Facades\Route::get('keys', [\Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'index'])->name('index');
-            \Illuminate\Support\Facades\Route::post('keys', [\Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'store'])->name('store');
-            \Illuminate\Support\Facades\Route::delete('keys/{keystone}', [\Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'destroy'])->name('destroy');
-            \Illuminate\Support\Facades\Route::post('keys/{keystone}/rotate', [\Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'rotate'])->name('rotate');
+            Illuminate\Support\Facades\Route::get('keys', [Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'index'])->name('index');
+            Illuminate\Support\Facades\Route::post('keys', [Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'store'])->name('store');
+            Illuminate\Support\Facades\Route::delete('keys/{keystone}', [Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'destroy'])->name('destroy');
+            Illuminate\Support\Facades\Route::post('keys/{keystone}/rotate', [Schtzie\Keystone\Http\Controllers\KeystoneController::class, 'rotate'])->name('rotate');
         });
 });
 
@@ -36,7 +36,7 @@ it('keystones.store creates a new key and returns credentials', function (): voi
     $user = User::create(['name' => 'Test']);
 
     $response = $this->actingAs($user)->postJson('/keystone/keys', [
-        'name'   => 'New Key',
+        'name' => 'New Key',
         'scopes' => ['read'],
     ]);
 
@@ -53,7 +53,7 @@ it('keystones.store rejects missing name', function (): void {
 });
 
 it('keystones.destroy revokes the specified key', function (): void {
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My Key');
 
     $this->actingAs($user)->deleteJson("/keystone/keys/{$result['model']->id}")
@@ -63,8 +63,8 @@ it('keystones.destroy revokes the specified key', function (): void {
 });
 
 it('keystones.destroy returns 404 for a key that does not belong to the user', function (): void {
-    $user1  = User::create(['name' => 'User 1']);
-    $user2  = User::create(['name' => 'User 2']);
+    $user1 = User::create(['name' => 'User 1']);
+    $user2 = User::create(['name' => 'User 2']);
     $result = $user1->createKeystone('User1 Key');
 
     $this->actingAs($user2)->deleteJson("/keystone/keys/{$result['model']->id}")
@@ -72,7 +72,7 @@ it('keystones.destroy returns 404 for a key that does not belong to the user', f
 });
 
 it('keystones.rotate rotates the key and returns new credentials', function (): void {
-    $user   = User::create(['name' => 'Test']);
+    $user = User::create(['name' => 'Test']);
     $result = $user->createKeystone('My Key');
 
     $response = $this->actingAs($user)->postJson("/keystone/keys/{$result['model']->id}/rotate");

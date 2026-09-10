@@ -6,8 +6,10 @@ namespace Schtzie\Keystone\Commands;
 
 use Illuminate\Console\Command;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Commands\Traits\HasTenantOption;
 use Schtzie\Keystone\Models\Keystone;
 use Schtzie\Keystone\Models\KeystoneAccessLog;
+use Throwable;
 
 /**
  * Artisan command to remove stale data from Keystone's database tables.
@@ -37,8 +39,11 @@ use Schtzie\Keystone\Models\KeystoneAccessLog;
  */
 final class PruneKeystonesCommand extends Command
 {
+    use HasTenantOption;
+
     /** @var string */
     protected $signature = 'keystone:prune
+        {--tenant= : The ID of the tenant database to execute within}
         {--days=         : Override the prune_revoked_after_days config value for revoked keys}
         {--access-logs   : Also prune access log entries older than access_log.prune_after_days}';
 
@@ -72,12 +77,12 @@ final class PruneKeystonesCommand extends Command
     {
         $daysOption = $this->option('days');
         $configDays = config('keystone.prune_revoked_after_days', 30);
-        $days       = (int) (is_numeric($daysOption) ? $daysOption : (is_numeric($configDays) ? $configDays : 30));
-        $cutoff     = now()->subDays($days);
+        $days = (int) (is_numeric($daysOption) ? $daysOption : (is_numeric($configDays) ? $configDays : 30));
+        $cutoff = now()->subDays($days);
 
         /** @var class-string<Keystone> $modelClass */
         $modelClass = config('keystone.model', Keystone::class);
-        $pruned     = 0;
+        $pruned = 0;
 
         $modelClass::whereNotNull('revoked_at')
             ->where('revoked_at', '<', $cutoff)
@@ -112,9 +117,9 @@ final class PruneKeystonesCommand extends Command
         }
 
         $configDays = config('keystone.access_log.prune_after_days', 90);
-        $days       = is_numeric($configDays) ? (int) $configDays : 90;
-        $cutoff     = now()->subDays($days);
-        $pruned     = 0;
+        $days = is_numeric($configDays) ? (int) $configDays : 90;
+        $cutoff = now()->subDays($days);
+        $pruned = 0;
 
         try {
             KeystoneAccessLog::where('created_at', '<', $cutoff)
@@ -128,8 +133,8 @@ final class PruneKeystonesCommand extends Command
                 });
 
             $this->info("Pruned {$pruned} access log entry/entries older than {$days} day(s).");
-        } catch (\Throwable $e) {
-            $this->error('Failed to prune access logs: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            $this->error('Failed to prune access logs: '.$e->getMessage());
             $this->error('Ensure the keystone-migrations-access-logs migration has been run.');
 
             return self::FAILURE;

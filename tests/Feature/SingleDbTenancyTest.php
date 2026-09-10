@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Tests\Fixtures\Tenant;
 use Schtzie\Keystone\Tests\Fixtures\User;
-use Schtzie\Keystone\Tests\Support\FakeTenant;
 
 // ── Setup ──────────────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ beforeEach(function (): void {
 });
 
 afterEach(function (): void {
-    FakeTenant::clear();
+    tenancy()->end();
     config(['keystone.tenancy.mode' => 'none']);
 
     // SQLite cannot DROP COLUMN when an index references it.
@@ -44,7 +44,8 @@ afterEach(function (): void {
 // ── Tenant Isolation ───────────────────────────────────────────────────────
 
 it('stamps tenant_id on the client record when creating', function (): void {
-    FakeTenant::set('tenant-a');
+    $tenant = Tenant::firstOrCreate(['id' => 'tenant-a']);
+    tenancy()->initialize($tenant);
 
     $user = User::create(['name' => 'Tenant A User']);
     $result = $user->createKeystone('Tenant A Key');
@@ -56,19 +57,25 @@ it('stamps tenant_id on the client record when creating', function (): void {
 });
 
 it('does not return keys from another tenant', function (): void {
-    FakeTenant::set('tenant-a');
+    $tenantA = Tenant::firstOrCreate(['id' => 'tenant-a']);
+    tenancy()->initialize($tenantA);
+
     $userA = User::create(['name' => 'Tenant A']);
     $userA->createKeystone('Key A');
-    FakeTenant::clear();
 
-    FakeTenant::set('tenant-b');
+    tenancy()->end();
+
+    $tenantB = Tenant::firstOrCreate(['id' => 'tenant-b']);
+    tenancy()->initialize($tenantB);
 
     // Tenant B's scope: userA's key should be invisible
     expect($userA->keystones()->count())->toBe(0);
 });
 
 it('namespaces cache keys by tenant_id in single_db mode', function (): void {
-    FakeTenant::set('tenant-a');
+    $tenant = Tenant::firstOrCreate(['id' => 'tenant-a']);
+    tenancy()->initialize($tenant);
+
     $user = User::create(['name' => 'Cache Tenant A']);
     $result = $user->createKeystone('Key A');
 
@@ -85,13 +92,16 @@ it('middleware rejects a key that belongs to a different tenant', function (): v
     Route::middleware('api.key')->get('/single-db-test', fn () => response()->json(['ok' => true]));
 
     // Create key under tenant-a
-    FakeTenant::set('tenant-a');
+    $tenantA = Tenant::firstOrCreate(['id' => 'tenant-a']);
+    tenancy()->initialize($tenantA);
+
     $user = User::create(['name' => 'Tenant A']);
     $result = $user->createKeystone('Key A');
-    FakeTenant::clear();
+    tenancy()->end();
 
     // Attempt auth as tenant-b — key is invisible under tenant-b's scope
-    FakeTenant::set('tenant-b');
+    $tenantB = Tenant::firstOrCreate(['id' => 'tenant-b']);
+    tenancy()->initialize($tenantB);
 
     $sig = hash_hmac('sha256', $result['client'], $result['secret']);
 
@@ -103,20 +113,24 @@ it('middleware rejects a key that belongs to a different tenant', function (): v
 
 it('revokeAllKeystones only affects the current tenant keys', function (): void {
     // Create key under tenant-a
-    FakeTenant::set('tenant-a');
+    $tenantA = Tenant::firstOrCreate(['id' => 'tenant-a']);
+    tenancy()->initialize($tenantA);
+
     $userA = User::create(['name' => 'Tenant A']);
     $userA->createKeystone('A Key');
-    FakeTenant::clear();
+    tenancy()->end();
 
     // Create key under tenant-b and revoke all
-    FakeTenant::set('tenant-b');
+    $tenantB = Tenant::firstOrCreate(['id' => 'tenant-b']);
+    tenancy()->initialize($tenantB);
+
     $userB = User::create(['name' => 'Tenant B']);
     $userB->createKeystone('B Key');
     $userB->revokeAllKeystones();
-    FakeTenant::clear();
+    tenancy()->end();
 
     // Tenant-a key must still be active
-    FakeTenant::set('tenant-a');
+    tenancy()->initialize($tenantA);
     expect($userA->keystones()->whereNull('revoked_at')->count())->toBe(1);
 });
 
@@ -126,18 +140,20 @@ it('individual keystone rate limit value takes priority over the global rate lim
     // Global limit is 1
     config(['keystone.rate_limit' => 1]);
 
-    FakeTenant::set('tenant-a');
+    $tenantA = Tenant::firstOrCreate(['id' => 'tenant-a']);
+    tenancy()->initialize($tenantA);
+
     $user = User::create(['name' => 'Rate Limit Tenant A']);
-    
+
     // Individual limit is 5
     $result = $user->createKeystone('Key A', [], null, ['rate_limit' => 5]);
-    
+
     // Explicitly warm the cache with the model
-    $cache = app(\Schtzie\Keystone\Cache\KeystoneKeyCacheRepository::class);
+    $cache = app(KeystoneKeyCacheRepository::class);
     $cache->put($result['model']);
-    
+
     // Flush the in-memory map to force the middleware to fetch from the cache
-    app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+    app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
 
     $sig = hash_hmac('sha256', $result['client'], $result['secret']);
     $headers = [
@@ -149,9 +165,28 @@ it('individual keystone rate limit value takes priority over the global rate lim
     for ($i = 0; $i < 5; $i++) {
         $this->getJson('/single-db-rate-limit', $headers)->assertOk();
         // Flush memory after each request so the next request also hits the cache
-        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+        app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
     }
-    
+
     // Request 6 (also from cache) should be rate limited
     $this->getJson('/single-db-rate-limit', $headers)->assertStatus(429);
+});
+
+it('middleware degrades gracefully when single_db mode is enabled but no tenant is initialized', function (): void {
+    Route::middleware('api.key')->get('/single-db-central', fn () => response()->json(['ok' => true]));
+
+    // We do NOT call tenancy()->initialize() here. tenant() returns null.
+    // So the system falls back to a global scope (acting as if tenancy is disabled for this request)
+    $user = User::create(['name' => 'Central User']);
+
+    // Create the key without a tenant active.
+    // Its tenant_id will be NULL in the database (or default)
+    $result = $user->createKeystone('Central Key');
+
+    $sig = hash_hmac('sha256', $result['client'], $result['secret']);
+
+    $this->getJson('/single-db-central', [
+        'X-Client-Id' => $result['client'],
+        'X-API-Signature' => $sig,
+    ])->assertOk();
 });

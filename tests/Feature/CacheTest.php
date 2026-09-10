@@ -31,13 +31,13 @@ function signedHeaders(array $result): array
 }
 
 dataset('cache_stores', [
-    'array', 'database', 'file', 'memcached', 'redis', 'dynamodb', 'octane', 'null'
+    'array', 'database', 'file', 'memcached', 'redis', 'dynamodb', 'octane', 'null',
 ]);
 
 function setupCacheStore(string $store): void
 {
-    if ($store === 'database' && !\Illuminate\Support\Facades\Schema::hasTable('cache')) {
-        \Illuminate\Support\Facades\Schema::create('cache', function (\Illuminate\Database\Schema\Blueprint $table) {
+    if ($store === 'database' && ! Illuminate\Support\Facades\Schema::hasTable('cache')) {
+        Illuminate\Support\Facades\Schema::create('cache', function (Illuminate\Database\Schema\Blueprint $table) {
             $table->string('key')->primary();
             $table->mediumText('value');
             $table->integer('expiration');
@@ -48,18 +48,18 @@ function setupCacheStore(string $store): void
         if ($store === 'redis') {
             config(['keystone.cache.store' => 'redis']);
             app()->forgetInstance('redis');
-            \Illuminate\Support\Facades\Redis::clearResolvedInstances();
-            \Illuminate\Support\Facades\Cache::forgetDriver('redis');
+            Illuminate\Support\Facades\Redis::clearResolvedInstances();
+            Cache::forgetDriver('redis');
         } else {
             config(['keystone.cache.store' => $store]);
         }
-        \Illuminate\Support\Facades\Cache::store($store)->has('ping');
-    } catch (\Throwable $e) {
+        Cache::store($store)->has('ping');
+    } catch (Throwable $e) {
         test()->markTestSkipped("Store [$store] is not available: {$e->getMessage()}");
     }
 
     app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
+    app()->forgetInstance(Schtzie\Keystone\Services\KeystoneService::class);
 }
 
 beforeEach(function (): void {
@@ -153,7 +153,7 @@ it('evicts the old key from cache when rotated', function (): void {
 it('handles cache enabled option', function (bool $enabled): void {
     config(['keystone.cache.enabled' => $enabled]);
     app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
+    app()->forgetInstance(Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
 
@@ -168,7 +168,7 @@ it('handles cache enabled option', function (bool $enabled): void {
     });
 
     if (! $enabled) {
-        app(\Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
+        app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
     }
 
     // Second request
@@ -215,18 +215,19 @@ it('supports different cache stores', function (string $store): void {
     setupCacheStore($store);
 
     [$user, $result] = makeUserWithKey();
-    
+
     cacheRepo()->put($result['model']);
-    
+
     $expectedKey = 'keystone:key:'.$result['client'];
-    
+
     if ($store === 'null') {
         expect(cacheRepo()->get($result['client']))->toBeNull();
+
         return;
     }
 
     expect(cacheRepo()->get($result['client']))->not->toBeNull()
-        ->and(\Illuminate\Support\Facades\Cache::store($store)->has($expectedKey))->toBeTrue();
+        ->and(Cache::store($store)->has($expectedKey))->toBeTrue();
 })->with('cache_stores');
 
 it('supports both phpredis and predis redis clients', function (string $redisClient): void {
@@ -234,20 +235,20 @@ it('supports both phpredis and predis redis clients', function (string $redisCli
         'database.redis.client' => $redisClient,
         'keystone.cache.store' => 'redis',
     ]);
-    
+
     app()->forgetInstance('redis');
-    \Illuminate\Support\Facades\Redis::clearResolvedInstances();
-    \Illuminate\Support\Facades\Cache::forgetDriver('redis');
-    
+    Illuminate\Support\Facades\Redis::clearResolvedInstances();
+    Cache::forgetDriver('redis');
+
     app()->forgetInstance(KeystoneKeyCacheRepository::class);
-    app()->forgetInstance(\Schtzie\Keystone\Services\KeystoneService::class);
+    app()->forgetInstance(Schtzie\Keystone\Services\KeystoneService::class);
 
     [$user, $result] = makeUserWithKey();
-    
+
     cacheRepo()->put($result['model']);
-    
+
     $expectedKey = 'keystone:key:'.$result['client'];
-    
+
     expect(Cache::store('redis')->has($expectedKey))->toBeTrue()
         ->and(cacheRepo()->get($result['client']))->not->toBeNull();
 })->with(['phpredis', 'predis']);
@@ -256,14 +257,14 @@ it('respects the ttl configuration', function (string $store): void {
     if ($store === 'null') {
         test()->markTestSkipped('Not applicable for null store');
     }
-    
+
     setupCacheStore($store);
     config(['keystone.cache.ttl' => 60]);
 
     [$user, $result] = makeUserWithKey();
-    
+
     cacheRepo()->put($result['model']);
-    
+
     expect(cacheRepo()->get($result['client']))->not->toBeNull();
 
     $this->travel(61)->seconds();
@@ -276,14 +277,14 @@ it('keeps cache indefinitely if ttl is null', function (string $store): void {
     if (in_array($store, ['null', 'database'])) {
         test()->markTestSkipped("Not applicable for $store store");
     }
-    
+
     setupCacheStore($store);
     config(['keystone.cache.ttl' => null]);
 
     [$user, $result] = makeUserWithKey();
-    
+
     cacheRepo()->put($result['model']);
-    
+
     expect(cacheRepo()->get($result['client']))->not->toBeNull();
 
     $this->travel(10)->years();
@@ -296,7 +297,7 @@ it('does not write-through to cache on miss if warm_on_miss is false', function 
     if ($store === 'null') {
         test()->markTestSkipped('Not applicable for null store');
     }
-    
+
     setupCacheStore($store);
     config([
         'keystone.cache.warm_on_miss' => false,
@@ -317,13 +318,13 @@ it('does not refresh cache ttl on use if refresh_on_use is false', function (str
     if ($store === 'null') {
         test()->markTestSkipped('Not applicable for null store');
     }
-    
+
     setupCacheStore($store);
     config(['keystone.cache.refresh_on_use' => false]);
     config(['keystone.cache.ttl' => 60]);
 
     [$user, $result] = makeUserWithKey();
-    
+
     cacheRepo()->put($result['model']);
 
     $this->travel(30)->seconds();
@@ -343,13 +344,13 @@ it('refreshes cache ttl on use if refresh_on_use is true', function (string $sto
     if ($store === 'null') {
         test()->markTestSkipped('Not applicable for null store');
     }
-    
+
     setupCacheStore($store);
     config(['keystone.cache.refresh_on_use' => true]);
     config(['keystone.cache.ttl' => 60]);
 
     [$user, $result] = makeUserWithKey();
-    
+
     cacheRepo()->put($result['model']);
 
     $this->travel(30)->seconds();
@@ -371,34 +372,72 @@ it('prefixes cache keys based on tenancy mode', function (string $mode, string $
     config(['keystone.tenancy.mode' => $mode]);
     app()->forgetInstance(KeystoneKeyCacheRepository::class);
 
-    if ($mode !== 'none') {
-        // Mock a tenant context using FakeTenant
-        \Schtzie\Keystone\Tests\Support\FakeTenant::set('test-tenant');
-    }
-
-    if ($mode === 'single_db' && \Illuminate\Support\Facades\Schema::hasTable('keystoneables') && ! \Illuminate\Support\Facades\Schema::hasColumn('keystoneables', 'tenant_id')) {
-        \Illuminate\Support\Facades\Schema::table('keystoneables', function ($table): void {
+    if ($mode === 'single_db' && Illuminate\Support\Facades\Schema::hasTable('keystoneables') && ! Illuminate\Support\Facades\Schema::hasColumn('keystoneables', 'tenant_id')) {
+        Illuminate\Support\Facades\Schema::table('keystoneables', function ($table): void {
             $table->string('tenant_id')->nullable()->index('keystoneables_tenant_id_index')->after('id');
         });
     }
 
+    if ($mode !== 'none') {
+        if ($mode === 'multi_db') {
+            $tenant = Schtzie\Keystone\Tests\Fixtures\Tenant::firstOrCreate(['id' => 'test-tenant']);
+            tenancy()->initialize($tenant);
+
+            $schema = app('db')->connection('tenant')->getSchemaBuilder();
+            if (! $schema->hasTable('keystoneables')) {
+                $schema->create('keystoneables', function ($table) {
+                    $table->id();
+                    $table->morphs('keystoneable');
+                    $table->string('name', 255);
+                    $table->string('client', 255)->unique();
+                    $table->string('secret', 255);
+                    $table->text('scopes')->nullable();
+                    $table->json('ip_allowlist')->nullable();
+                    $table->json('ip_blocklist')->nullable();
+                    $table->json('metadata')->nullable();
+                    $table->unsignedInteger('rate_limit')->nullable();
+                    $table->timestamp('expires_at')->nullable();
+                    $table->timestamp('grace_expires_at')->nullable();
+                    $table->timestamp('revoked_at')->nullable();
+                    $table->timestamps();
+                });
+            }
+        } else {
+            $tenant = Schtzie\Keystone\Tests\Fixtures\Tenant::firstOrCreate(['id' => 'test-tenant']);
+            tenancy()->initialize($tenant);
+        }
+    }
+
+    // In multi_db mode we need the users table as well if we are creating a user
+    if ($mode === 'multi_db') {
+        $schema = app('db')->connection('tenant')->getSchemaBuilder();
+        if (! $schema->hasTable('users')) {
+            $schema->create('users', function ($table) {
+                $table->increments('id');
+                $table->string('name');
+                $table->timestamps();
+            });
+        }
+    }
+
     [$user, $result] = makeUserWithKey();
-    
+
     cacheRepo()->put($result['model']);
 
-    $expectedKey = $expectedPrefix . 'key:' . $result['client'];
-    
+    $expectedKey = $expectedPrefix.'key:'.$result['client'];
+
     expect(Cache::store('array')->has($expectedKey))->toBeTrue();
     expect(cacheRepo()->get($result['client']))->not->toBeNull();
 
     if ($mode !== 'none') {
-        \Schtzie\Keystone\Tests\Support\FakeTenant::clear();
+        tenancy()->end();
         config(['keystone.tenancy.mode' => 'none']);
     }
 
-    if ($mode === 'single_db' && \Illuminate\Support\Facades\Schema::hasColumn('keystoneables', 'tenant_id')) {
-        \Illuminate\Support\Facades\DB::statement('DROP INDEX IF EXISTS keystoneables_tenant_id_index');
-        \Illuminate\Support\Facades\Schema::table('keystoneables', function ($table): void {
+    if ($mode === 'single_db' && Illuminate\Support\Facades\Schema::hasColumn('keystoneables', 'tenant_id')) {
+        Illuminate\Support\Facades\DB::statement('DROP INDEX IF EXISTS keystoneables_tenant_id_index');
+        Illuminate\Support\Facades\DB::statement('DROP INDEX IF EXISTS keystoneables_tenant_key_index');
+        Illuminate\Support\Facades\Schema::table('keystoneables', function ($table): void {
             $table->dropColumn('tenant_id');
         });
     }
@@ -407,4 +446,3 @@ it('prefixes cache keys based on tenancy mode', function (string $mode, string $
     ['single_db', 'keystone:test-tenant:'],
     ['multi_db', 'keystone:test-tenant:'],
 ]);
-

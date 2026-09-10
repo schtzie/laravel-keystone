@@ -162,9 +162,9 @@ return [
     */
 
     'replay_protection' => [
-        'enabled'          => (bool) env('KEYSTONE_REPLAY_PROTECTION', false),
+        'enabled' => (bool) env('KEYSTONE_REPLAY_PROTECTION', false),
         'timestamp_header' => 'X-Timestamp',
-        'window_seconds'   => (int) env('KEYSTONE_REPLAY_WINDOW', 30),
+        'window_seconds' => (int) env('KEYSTONE_REPLAY_WINDOW', 30),
     ],
 
     /*
@@ -182,7 +182,7 @@ return [
     */
 
     'body_signing' => [
-        'header'           => 'X-Body-Hash',
+        'header' => 'X-Body-Hash',
         'require_on_empty' => false,
     ],
 
@@ -312,11 +312,11 @@ return [
     */
 
     'cache' => [
-        'enabled'        => (bool) env('KEYSTONE_CACHE_ENABLED', true),
-        'store'          => env('KEYSTONE_CACHE_STORE', 'redis'),
-        'ttl'            => (int) env('KEYSTONE_CACHE_TTL', 3600),
-        'prefix'         => 'keystone',
-        'warm_on_miss'   => true,
+        'enabled' => (bool) env('KEYSTONE_CACHE_ENABLED', true),
+        'store' => env('KEYSTONE_CACHE_STORE', 'redis'),
+        'ttl' => (int) env('KEYSTONE_CACHE_TTL', 3600),
+        'prefix' => 'keystone',
+        'warm_on_miss' => true,
         'refresh_on_use' => true,
     ],
 
@@ -340,10 +340,10 @@ return [
     */
 
     'access_log' => [
-        'enabled'          => (bool) env('KEYSTONE_ACCESS_LOG', false),
-        'driver'           => env('KEYSTONE_ACCESS_LOG_DRIVER', 'database'),
-        'table'            => 'keystone_access_logs',
-        'channel'          => null,
+        'enabled' => (bool) env('KEYSTONE_ACCESS_LOG', false),
+        'driver' => env('KEYSTONE_ACCESS_LOG_DRIVER', 'database'),
+        'table' => 'keystone_access_logs',
+        'channel' => null,
         'prune_after_days' => (int) env('KEYSTONE_ACCESS_LOG_PRUNE_DAYS', 90),
     ],
 
@@ -373,8 +373,8 @@ return [
     */
 
     'routes' => [
-        'enabled'    => (bool) env('KEYSTONE_ROUTES_ENABLED', false),
-        'prefix'     => env('KEYSTONE_ROUTES_PREFIX', 'keystone'),
+        'enabled' => (bool) env('KEYSTONE_ROUTES_ENABLED', false),
+        'prefix' => env('KEYSTONE_ROUTES_PREFIX', 'keystone'),
         'middleware' => ['auth'],
     ],
 
@@ -399,8 +399,8 @@ return [
     */
 
     'tenancy' => [
-        'mode'                       => env('KEYSTONE_TENANCY_MODE', 'none'),
-        'tenant_id_column'           => 'tenant_id',
+        'mode' => env('KEYSTONE_TENANCY_MODE', 'none'),
+        'tenant_id_column' => 'tenant_id',
         'auto_register_bootstrapper' => true,
     ],
 

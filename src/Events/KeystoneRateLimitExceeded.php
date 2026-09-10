@@ -25,11 +25,11 @@ use Schtzie\Keystone\Models\Keystone;
 final class KeystoneRateLimitExceeded
 {
     /**
-     * @param  Keystone  $keystone    The API key that hit the rate limit.
-     * @param  Request   $request     The HTTP request that triggered the limit.
-     * @param  int       $limit       The maximum number of requests allowed in the window.
-     * @param  int       $retryAfter  Seconds remaining until the rate limit resets.
-     * @param  string    $windowType  Which limit was breached: 'per_minute', 'per_day', or 'scope:{name}'.
+     * @param  Keystone  $keystone  The API key that hit the rate limit.
+     * @param  Request  $request  The HTTP request that triggered the limit.
+     * @param  int  $limit  The maximum number of requests allowed in the window.
+     * @param  int  $retryAfter  Seconds remaining until the rate limit resets.
+     * @param  string  $windowType  Which limit was breached: 'per_minute', 'per_day', or 'scope:{name}'.
      */
     public function __construct(
         public readonly Keystone $keystone,

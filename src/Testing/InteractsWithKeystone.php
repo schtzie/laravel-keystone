@@ -45,10 +45,9 @@ trait InteractsWithKeystone
      * following `$this->getJson(...)` / `$this->postJson(...)` calls pass the
      * `api.key` middleware without any additional header setup.
      *
-     * @param  Model         $owner  Any model that uses the HasKeystones trait.
-     * @param  string        $name   Label for the temporary test key (visible in DB during test).
+     * @param  Model  $owner  Any model that uses the HasKeystones trait.
+     * @param  string  $name  Label for the temporary test key (visible in DB during test).
      * @param  array<int, string>  $scopes  Scopes to assign to the temporary key.
-     * @return static
      */
     public function actingWithKeystone(
         Model $owner,
@@ -56,17 +55,17 @@ trait InteractsWithKeystone
         array $scopes = [],
     ): static {
         /** @var array{client: string, secret: string, model: Keystone} $result */
-        $result    = $owner->createKeystone($name, $scopes); // @phpstan-ignore-line
-        $client    = $result['client'];
-        $secret    = $result['secret'];
+        $result = $owner->createKeystone($name, $scopes); // @phpstan-ignore-line
+        $client = $result['client'];
+        $secret = $result['secret'];
         $signature = hash_hmac('sha256', $client, $secret);
 
         $clientHeader = config('keystone.header', 'X-Client-Id');
-        $sigHeader    = config('keystone.signature_header', 'X-API-Signature');
+        $sigHeader = config('keystone.signature_header', 'X-API-Signature');
 
         return $this->withHeaders([
             is_string($clientHeader) ? $clientHeader : 'X-Client-Id' => $client,
-            is_string($sigHeader)    ? $sigHeader    : 'X-API-Signature' => $signature,
+            is_string($sigHeader) ? $sigHeader : 'X-API-Signature' => $signature,
         ]);
     }
 
@@ -77,7 +76,6 @@ trait InteractsWithKeystone
      * Useful when testing that scope-enforcement on a route works correctly.
      *
      * @param  array<int, string>  $scopes
-     * @return static
      */
     public function actingWithKeystoneScopes(
         Model $owner,

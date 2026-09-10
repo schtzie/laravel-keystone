@@ -310,12 +310,14 @@ $result = $user->createKeystone(
     now()->addDays(30)->toImmutable()
 );
 
-// Advanced generation with IP restrictions and custom rate limits
+// Advanced generation with IP restrictions, custom rate limits, and extended metadata
 $result = $user->createKeystone(
     'Production Key',
     ['read', 'write'],
     null,
     [
+        'description'  => 'Used by the mobile application backend',
+        'metadata'     => ['environment' => 'production', 'team' => 'backend'],
         'ip_allowlist' => ['192.168.1.0/24', '10.0.0.5'],
         'ip_blocklist' => ['192.168.1.100'],
         'rate_limit'   => 120, // allows 120 requests per window
@@ -331,6 +333,14 @@ $result['secret'];
 // The persisted Keystone Eloquent model record
 $result['model'];      
 ```
+
+**Supported `$options`:**
+When calling `createKeystone()`, the fourth argument is an array of additional options. The following fields are supported and will be automatically persisted to the database:
+- `description` (string): Extended human-readable notes.
+- `metadata` (array): Arbitrary key/value tags for custom filtering and auditing.
+- `ip_allowlist` (array): Only requests originating from these IPs or CIDR blocks are allowed.
+- `ip_blocklist` (array): Requests originating from these IPs or CIDR blocks are rejected.
+- `rate_limit` (int): A custom per-minute request cap that overrides the global default.
 
 > **Security note:** Both the plain Client and the plain secret are stored in the database. The authentication security comes from the HMAC-SHA256 signature requirement — possessing only the Client is never sufficient to authenticate.
 
@@ -1116,6 +1126,29 @@ php artisan keystone:prune --access-logs --log-days=90
 php artisan keystone:status
 ```
 
+### Multi-Database Tenancy Commands
+
+If you are using a `multi_db` tenancy approach (where each tenant has their own isolated database), you can execute any Keystone Artisan command against a specific tenant's connection using the `--tenant=` option:
+
+```bash
+php artisan keystone:list --tenant=acme-corp
+php artisan keystone:generate "App\Models\User" 1 "Acme Key" --tenant=acme-corp
+```
+
+Because Keystone is agnostic to your tenancy implementation, you **must** register a callback in your `AppServiceProvider` to instruct Keystone on how to physically switch the database connection:
+
+```php
+use Schtzie\Keystone\Facades\Keystone;
+
+public function boot(): void
+{
+    // Example for stancl/tenancy
+    Keystone::initializeTenantUsing(function (string $tenantId) {
+        tenancy()->initialize($tenantId);
+    });
+}
+```
+
 ---
 
 
@@ -1133,6 +1166,43 @@ Keystone provides a comprehensive suite of events you can listen to in your `App
 | `KeystoneCreated` | A new key pair is generated | `$keystone`, `$plainSecret` |
 | `KeystoneRevoked` | An active key is revoked | `$keystone` |
 | `KeystoneRotated` | A key is rotated (old key revoked, new key generated) | `$oldKeystone`, `$newKeystone`, `$plainSecret` |
+
+### Example: Logging Security Alerts
+
+You can easily listen to these events in your `AppServiceProvider` to trigger external webhooks or log security incidents to exception trackers like Sentry:
+
+```php
+use Schtzie\Keystone\Events\KeystoneAuthFailed;
+use Schtzie\Keystone\Events\KeystoneRateLimitExceeded;
+use Illuminate\Support\Facades\Event;
+use Sentry\State\Scope;
+
+public function boot(): void
+{
+    // Log suspicious auth failures to Sentry
+    Event::listen(function (KeystoneAuthFailed $event) {
+        // Only log severe security rejections, ignore general missing headers
+        if (in_array($event->reason, ['invalid_credentials', 'ip_not_allowed', 'ip_blocked'])) {
+            \Sentry\withScope(function (Scope $scope) use ($event) {
+                $scope->setTag('failure_reason', $event->reason);
+                if ($event->client) {
+                    $scope->setTag('client_id', $event->client);
+                }
+                
+                \Sentry\captureMessage("Security Alert: API Auth Failed ({$event->reason})");
+            });
+        }
+    });
+
+    // Log Rate Limit breaches to Sentry
+    Event::listen(function (KeystoneRateLimitExceeded $event) {
+        \Sentry\withScope(function (Scope $scope) use ($event) {
+            $scope->setTag('client_id', $event->keystone->client);
+            \Sentry\captureMessage('API Rate Limit Exceeded');
+        });
+    });
+}
+```
 
 ### Eloquent Model Observers
 
@@ -1158,6 +1228,50 @@ $this->assertDatabaseHas('keystoneables', [
     'client' => $result['client'],
     'name'   => 'Test Key',
 ]);
+```
+
+### Asserting events were dispatched
+
+When testing your application's integration with Keystone, you can use Laravel's built-in Event faker to ensure security events are firing correctly:
+
+```php
+use Illuminate\Support\Facades\Event;
+use Schtzie\Keystone\Events\KeystoneAuthFailed;
+
+public function test_it_dispatches_failure_event_on_bad_signature(): void
+{
+    Event::fake();
+
+    // Send a request with a deliberately bad signature
+    $this->getJson('/api/protected', [
+        'X-Client-Id'     => 'ks_valid_client_id',
+        'X-API-Signature' => 'invalid_signature_string',
+    ])->assertUnauthorized();
+
+    // Assert the event was caught and the reason is exactly what we expect
+    Event::assertDispatched(KeystoneAuthFailed::class, function (KeystoneAuthFailed $event) {
+        return $event->reason === 'invalid_credentials';
+    });
+}
+```
+
+**If you are using Pest PHP:**
+```php
+use Illuminate\Support\Facades\Event;
+use Schtzie\Keystone\Events\KeystoneAuthFailed;
+
+it('dispatches failure event on bad signature', function () {
+    Event::fake();
+
+    $this->getJson('/api/protected', [
+        'X-Client-Id'     => 'ks_valid_client_id',
+        'X-API-Signature' => 'invalid_signature_string',
+    ])->assertUnauthorized();
+
+    Event::assertDispatched(KeystoneAuthFailed::class, function (KeystoneAuthFailed $event) {
+        return $event->reason === 'invalid_credentials';
+    });
+});
 ```
 
 ### Asserting authenticated requests
@@ -1246,6 +1360,13 @@ $expiredKey = KeystoneFactory::new()->expired()->create();
 $revokedKey = KeystoneFactory::new()->revoked()->create();
 $scopedKey  = KeystoneFactory::new()->withScopes(['admin'])->create();
 $metaKey    = KeystoneFactory::new()->withMetadata(['version' => '1.0'])->create();
+
+// Generate keys with strict security and rate limiting rules
+$secureKey = KeystoneFactory::new()
+    ->withRateLimit(500)
+    ->withIpAllowlist(['192.168.1.0/24'])
+    ->withIpBlocklist(['10.0.0.15'])
+    ->create('Secure API Key');
 ```
 
 ### Disabling the cache in tests

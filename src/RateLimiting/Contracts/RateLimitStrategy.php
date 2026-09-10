@@ -34,9 +34,9 @@ interface RateLimitStrategy
      * Implementations must be atomic — concurrent attempts from the same key
      * must not both succeed when only one slot remains.
      *
-     * @param  string  $key            A namespaced cache key unique to this client + window.
-     * @param  int     $limit          Maximum requests permitted in the window.
-     * @param  int     $windowSeconds  Duration of the rate-limit window in seconds.
+     * @param  string  $key  A namespaced cache key unique to this client + window.
+     * @param  int  $limit  Maximum requests permitted in the window.
+     * @param  int  $windowSeconds  Duration of the rate-limit window in seconds.
      * @return bool True if the request is within limits and should proceed; false to throttle.
      */
     public function attempt(string $key, int $limit, int $windowSeconds): bool;
@@ -47,9 +47,9 @@ interface RateLimitStrategy
      *
      * Used to populate the `X-Keystone-RateLimit-Remaining` response header.
      *
-     * @param  string  $key            The same namespaced key passed to `attempt()`.
-     * @param  int     $limit          The same limit ceiling passed to `attempt()`.
-     * @param  int     $windowSeconds  The same window duration passed to `attempt()`.
+     * @param  string  $key  The same namespaced key passed to `attempt()`.
+     * @param  int  $limit  The same limit ceiling passed to `attempt()`.
+     * @param  int  $windowSeconds  The same window duration passed to `attempt()`.
      */
     public function remaining(string $key, int $limit, int $windowSeconds): int;
 

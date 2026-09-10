@@ -6,6 +6,7 @@ namespace Schtzie\Keystone\Commands;
 
 use Illuminate\Console\Command;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Commands\Traits\HasTenantOption;
 use Schtzie\Keystone\Models\Keystone;
 
 /**
@@ -30,8 +31,11 @@ use Schtzie\Keystone\Models\Keystone;
  */
 final class WarmCacheCommand extends Command
 {
+    use HasTenantOption;
+
     /** @var string */
     protected $signature = 'keystone:warm
+        {--tenant= : The ID of the tenant database to execute within}
         {--chunk=500 : Number of records to load per database batch}';
 
     /** @var string */

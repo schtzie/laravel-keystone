@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Schtzie\Keystone\Commands;
 
 use Illuminate\Console\Command;
-use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
+use Schtzie\Keystone\Commands\Traits\HasTenantOption;
 use Schtzie\Keystone\Models\Keystone;
+use Throwable;
 
 /**
  * Artisan command to display a health and statistics summary for Keystone.
@@ -24,8 +25,10 @@ use Schtzie\Keystone\Models\Keystone;
  */
 final class StatusKeystoneCommand extends Command
 {
+    use HasTenantOption;
+
     /** @var string */
-    protected $signature = 'keystone:status';
+    protected $signature = 'keystone:status {--tenant= : The ID of the tenant database to execute within}';
 
     /** @var string */
     protected $description = 'Display a summary of Keystone configuration, key counts, and cache status.';
@@ -43,18 +46,18 @@ final class StatusKeystoneCommand extends Command
         /** @var class-string<Keystone> $modelClass */
         $modelClass = config('keystone.model', Keystone::class);
 
-        $total   = $modelClass::count();
+        $total = $modelClass::count();
         $revoked = $modelClass::whereNotNull('revoked_at')->count();
         $expired = $modelClass::whereNull('revoked_at')
             ->whereNotNull('expires_at')
             ->where('expires_at', '<', now())
             ->count();
-        $active  = $total - $revoked - $expired;
+        $active = $total - $revoked - $expired;
 
-        $withRateLimit  = $modelClass::whereNotNull('rate_limit')->count();
-        $withScopes     = $modelClass::whereNotNull('scopes')->count();
-        $withAllowlist  = $modelClass::whereNotNull('ip_allowlist')->count();
-        $withBlocklist  = $modelClass::whereNotNull('ip_blocklist')->count();
+        $withRateLimit = $modelClass::whereNotNull('rate_limit')->count();
+        $withScopes = $modelClass::whereNotNull('scopes')->count();
+        $withAllowlist = $modelClass::whereNotNull('ip_allowlist')->count();
+        $withBlocklist = $modelClass::whereNotNull('ip_blocklist')->count();
 
         $this->newLine();
         $this->line('<fg=blue;options=bold>── Keystone Status ──────────────────────────────</> ');
@@ -84,7 +87,7 @@ final class StatusKeystoneCommand extends Command
             [
                 ['Status',   $cacheEnabled],
                 ['Store',    config('keystone.cache.store', 'redis')],
-                ['TTL',      ($ttl = config('keystone.cache.ttl')) !== null && is_scalar($ttl) ? ((string) $ttl) . 's' : 'none'],
+                ['TTL',      ($ttl = config('keystone.cache.ttl')) !== null && is_scalar($ttl) ? ((string) $ttl).'s' : 'none'],
 
                 ['Prefix',   config('keystone.cache.prefix', 'keystone')],
                 ['Strategy', config('keystone.rate_limit_strategy', 'fixed_window')],
@@ -94,13 +97,13 @@ final class StatusKeystoneCommand extends Command
         // Access log
         $this->line('<fg=white;options=bold>Access Log</> ');
         $logEnabled = config('keystone.access_log.enabled', false);
-        $logStatus  = $logEnabled ? '<fg=green>enabled</>' : '<fg=yellow>disabled</>';
-        $logRows    = [];
+        $logStatus = $logEnabled ? '<fg=green>enabled</>' : '<fg=yellow>disabled</>';
+        $logRows = [];
 
         if ($logEnabled) {
             try {
                 $logRows[] = ['Log rows (total)', \Schtzie\Keystone\Models\KeystoneAccessLog::count()];
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $logRows[] = ['Log rows (total)', '<fg=red>table not found</>'];
             }
         }

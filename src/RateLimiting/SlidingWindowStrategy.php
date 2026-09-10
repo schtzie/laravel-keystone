@@ -54,7 +54,7 @@ final class SlidingWindowStrategy implements RateLimitStrategy
             return (new FixedWindowStrategy())->attempt($key, $limit, $windowSeconds);
         }
 
-        $nowMs    = (int) (microtime(true) * 1000);
+        $nowMs = (int) (microtime(true) * 1000);
         $windowMs = $windowSeconds * 1000;
 
         // Prune stale entries that have fallen outside the rolling window
@@ -68,7 +68,7 @@ final class SlidingWindowStrategy implements RateLimitStrategy
 
         // Store the timestamp as both score and member (appended with a unique suffix
         // to avoid member collisions when multiple requests arrive in the same millisecond)
-        $member = $nowMs . '-' . bin2hex(random_bytes(4));
+        $member = $nowMs.'-'.bin2hex(random_bytes(4));
         $connection->zAdd($key, $nowMs, $member);
 
         // Keep the sorted set alive just long enough to cover one full window
@@ -89,7 +89,7 @@ final class SlidingWindowStrategy implements RateLimitStrategy
             return (new FixedWindowStrategy())->remaining($key, $limit, $windowSeconds);
         }
 
-        $nowMs    = (int) (microtime(true) * 1000);
+        $nowMs = (int) (microtime(true) * 1000);
         $windowMs = $windowSeconds * 1000;
 
         $connection->zRemRangeByScore($key, '-inf', (string) ($nowMs - $windowMs));
@@ -117,7 +117,6 @@ final class SlidingWindowStrategy implements RateLimitStrategy
         /** @var mixed $oldest */
         $oldest = $connection->command('zRange', [$key, 0, 0, 'WITHSCORES']);
 
-
         if (! is_array($oldest) || empty($oldest)) {
             return 0;
         }
@@ -144,9 +143,9 @@ final class SlidingWindowStrategy implements RateLimitStrategy
     private function redisConnection(): mixed
     {
         $storeConfig = config('keystone.cache.store', 'redis');
-        $storeName   = is_string($storeConfig) ? $storeConfig : 'redis';
-        $store       = app('cache')->store($storeName);
-        $inner       = ($store instanceof Repository) ? $store->getStore() : null;
+        $storeName = is_string($storeConfig) ? $storeConfig : 'redis';
+        $store = app('cache')->store($storeName);
+        $inner = ($store instanceof Repository) ? $store->getStore() : null;
 
         if (! ($inner instanceof RedisStore)) {
             return null;

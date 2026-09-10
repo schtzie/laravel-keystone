@@ -32,7 +32,7 @@ final class KeystoneAuthFailed
 {
     /**
      * @param  Request  $request  The incoming HTTP request that was rejected.
-     * @param  string   $reason   A machine-readable identifier for the specific failure point.
+     * @param  string  $reason  A machine-readable identifier for the specific failure point.
      */
     public function __construct(
         public readonly Request $request,

@@ -23,9 +23,9 @@ use Schtzie\Keystone\Models\Keystone;
 final class KeystoneCreated
 {
     /**
-     * @param  Keystone  $keystone     The fully persisted Keystone model (secret stored as plain text in DB).
-     * @param  string    $plainClient  The plain client identifier handed to the API consumer (e.g. "ks_abc…").
-     * @param  string    $plainSecret  The plain HMAC-signing secret — shown once, then impossible to recover.
+     * @param  Keystone  $keystone  The fully persisted Keystone model (secret stored as plain text in DB).
+     * @param  string  $plainClient  The plain client identifier handed to the API consumer (e.g. "ks_abc…").
+     * @param  string  $plainSecret  The plain HMAC-signing secret — shown once, then impossible to recover.
      */
     public function __construct(
         public readonly Keystone $keystone,

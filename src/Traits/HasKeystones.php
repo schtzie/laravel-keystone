@@ -7,6 +7,8 @@ namespace Schtzie\Keystone\Traits;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use RuntimeException;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
 use Schtzie\Keystone\Events\KeystoneCreated;
 use Schtzie\Keystone\Events\KeystoneRotated;
@@ -98,15 +100,15 @@ trait HasKeystones
      * If `keystone.max_keys_per_owner` is configured and the owner already holds
      * that many active keys, a RuntimeException is thrown before any DB write.
      *
-     * @param  array<int, string>   $scopes   Allowed scopes for this key (e.g. ['read', 'write']).
-     * @param  array<string, mixed> $options  Extra columns to pass through to the create call.
+     * @param  array<int, string>|null  $scopes  Allowed scopes for this key (e.g. ['read', 'write']).
+     * @param  array<string, mixed>  $options  Extra columns to pass through to the create call.
      * @return array{client: string, secret: string, model: Keystone}
      *
-     * @throws \RuntimeException When the owner has reached the max-keys-per-owner limit.
+     * @throws RuntimeException When the owner has reached the max-keys-per-owner limit.
      */
     public function createKeystone(
         string $name,
-        array $scopes = [],
+        ?array $scopes = null,
         ?CarbonImmutable $expiresAt = null,
         array $options = [],
     ): array {
@@ -117,30 +119,30 @@ trait HasKeystones
             $activeCount = $this->keystones()->whereNull('revoked_at')->count(); // @phpstan-ignore-line
 
             if ($activeCount >= (int) $maxKeys) {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     "This owner already has {$activeCount} active API key(s), which equals the ".
                     "configured maximum of {$maxKeys}. Revoke an existing key before creating a new one."
                 );
             }
         }
 
-        $prefixConfig   = config('keystone.prefix', 'ks_');
-        $prefix         = is_string($prefixConfig) ? $prefixConfig : 'ks_';
+        $prefixConfig = config('keystone.prefix', 'ks_');
+        $prefix = is_string($prefixConfig) ? $prefixConfig : 'ks_';
         $keyLengthConfig = config('keystone.key_length', 40);
-        $keyLength      = is_numeric($keyLengthConfig) ? (int) $keyLengthConfig : 40;
+        $keyLength = is_numeric($keyLengthConfig) ? (int) $keyLengthConfig : 40;
 
-        $plain  = $prefix . bin2hex(random_bytes($keyLength));
+        $plain = $prefix.bin2hex(random_bytes($keyLength));
         $secret = bin2hex(random_bytes($keyLength));
 
         $defaultScopesConfig = config('keystone.default_scopes', []);
-        $defaultScopes       = is_array($defaultScopesConfig) ? $defaultScopesConfig : [];
+        $defaultScopes = is_array($defaultScopesConfig) ? $defaultScopesConfig : [];
 
         /** @var Keystone $model */
         $model = $this->keystones()->create(array_merge([ // @phpstan-ignore-line
-            'name'       => $name,
-            'client'     => $plain,
-            'secret'     => $secret,
-            'scopes'     => $scopes !== [] ? $scopes : $defaultScopes,
+            'name' => $name,
+            'client' => $plain,
+            'secret' => $secret,
+            'scopes' => $scopes !== null ? $scopes : $defaultScopes,
             'expires_at' => $expiresAt,
         ], $options));
 
@@ -149,7 +151,7 @@ trait HasKeystones
         return [
             'client' => $plain,
             'secret' => $secret,
-            'model'  => $model,
+            'model' => $model,
         ];
     }
 
@@ -166,6 +168,10 @@ trait HasKeystones
         $model = $key instanceof Keystone
             ? $key
             : $this->keystones()->findOrFail($key); // @phpstan-ignore-line
+
+        if ($model->keystoneable_id !== $this->getKey() || $model->keystoneable_type !== $this->getMorphClass()) {
+            throw new InvalidArgumentException('This keystone does not belong to this owner.');
+        }
 
         return $model->revoke();
     }
@@ -212,13 +218,17 @@ trait HasKeystones
                 ? $old
                 : $this->keystones()->findOrFail($old); // @phpstan-ignore-line
 
+            if ($oldModel->keystoneable_id !== $this->getKey() || $oldModel->keystoneable_type !== $this->getMorphClass()) {
+                throw new InvalidArgumentException('This keystone does not belong to this owner.');
+            }
+
             $graceSeconds = (int) config('keystone.rotation_grace_seconds', 0);
 
             if ($graceSeconds > 0) {
                 // Set a grace window instead of immediately revoking — the old key
                 // remains valid until grace_expires_at, giving consumers time to rotate
                 $oldModel->update([
-                    'revoked_at'       => now(),
+                    'revoked_at' => now(),
                     'grace_expires_at' => now()->addSeconds($graceSeconds),
                 ]);
 
@@ -236,9 +246,9 @@ trait HasKeystones
                 options: [
                     'ip_allowlist' => $oldModel->ip_allowlist,
                     'ip_blocklist' => $oldModel->ip_blocklist,
-                    'rate_limit'   => $oldModel->rate_limit,
-                    'description'  => $oldModel->description, // @phpstan-ignore-line
-                    'metadata'     => $oldModel->metadata,    // @phpstan-ignore-line
+                    'rate_limit' => $oldModel->rate_limit,
+                    'description' => $oldModel->description, // @phpstan-ignore-line
+                    'metadata' => $oldModel->metadata,    // @phpstan-ignore-line
                 ],
             );
 

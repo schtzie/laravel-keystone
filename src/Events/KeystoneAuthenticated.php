@@ -27,7 +27,7 @@ final class KeystoneAuthenticated
 {
     /**
      * @param  Keystone  $keystone  The authenticated API key that passed all validation checks.
-     * @param  Request   $request   The current HTTP request associated with this authentication attempt.
+     * @param  Request  $request  The current HTTP request associated with this authentication attempt.
      */
     public function __construct(
         public readonly Keystone $keystone,

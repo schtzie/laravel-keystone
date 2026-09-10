@@ -110,7 +110,7 @@ final class KeystoneFake implements KeystoneServiceContract
         Assert::assertCount(
             $times,
             $this->resolvedRequests,
-            "Expected {$times} authentication attempt(s), got " . count($this->resolvedRequests) . '.'
+            "Expected {$times} authentication attempt(s), got ".count($this->resolvedRequests).'.'
         );
     }
 
@@ -136,7 +136,7 @@ final class KeystoneFake implements KeystoneServiceContract
     {
         Assert::assertEmpty(
             $this->resolvedRequests,
-            'Expected no authentication attempts, but resolve() was called ' . count($this->resolvedRequests) . ' time(s).'
+            'Expected no authentication attempts, but resolve() was called '.count($this->resolvedRequests).' time(s).'
         );
     }
 }

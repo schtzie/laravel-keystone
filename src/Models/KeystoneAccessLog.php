@@ -31,18 +31,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *   - For very high-traffic APIs consider using a dedicated log store or an
  *     async queue worker to absorb write spikes.
  *
- * @property int                    $id
- * @property int|null               $keystone_id
- * @property string|null            $keystoneable_type
- * @property int|string|null        $keystoneable_id
- * @property string|null            $tenant_id
- * @property string|null            $ip_address
- * @property string                 $method
- * @property string                 $path
+ * @property int $id
+ * @property int|null $keystone_id
+ * @property string|null $keystoneable_type
+ * @property int|string|null $keystoneable_id
+ * @property string|null $tenant_id
+ * @property string|null $ip_address
+ * @property string $method
+ * @property string $path
  * @property array<int,string>|null $scopes_used
- * @property int                    $status_code
- * @property string                 $event
- * @property CarbonImmutable        $created_at
+ * @property int $status_code
+ * @property string $event
+ * @property CarbonImmutable $created_at
  * @property-read Keystone|null     $keystone
  */
 class KeystoneAccessLog extends Model
@@ -72,7 +72,7 @@ class KeystoneAccessLog extends Model
     protected $casts = [
         'scopes_used' => 'array',
         'status_code' => 'integer',
-        'created_at'  => 'immutable_datetime',
+        'created_at' => 'immutable_datetime',
     ];
 
     /**

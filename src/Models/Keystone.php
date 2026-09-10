@@ -26,24 +26,24 @@ use Schtzie\Keystone\Tenancy\Concerns\TenantAware;
  * configurable grace period (`grace_expires_at`) to enable zero-downtime credential
  * rollovers — the new key can be deployed to consumers before the old one dies.
  *
- * @property int                    $id
- * @property string                 $keystoneable_type
- * @property int|string             $keystoneable_id
- * @property string|null            $tenant_id
- * @property string                 $name
- * @property string|null            $description           Extended notes beyond the short name.
- * @property string                 $client                Plain public identifier sent by consumers.
- * @property string                 $secret                Plain HMAC-SHA256 signing secret.
- * @property array<int,string>|null $scopes                Allowed operation scopes, e.g. ['read','write'].
- * @property array<int,string>|null $ip_allowlist          Only these IPs may use this key.
- * @property array<int,string>|null $ip_blocklist          These IPs are always rejected.
- * @property int|null               $rate_limit            Per-minute request cap (null = global default).
- * @property array<string,mixed>|null $metadata            Arbitrary key/value tags for filtering and auditing.
- * @property CarbonImmutable|null   $expires_at            Null means the key never expires.
- * @property CarbonImmutable|null   $grace_expires_at      A revoked key is still valid until this datetime.
- * @property CarbonImmutable|null   $revoked_at            Non-null stamps the key as soft-revoked.
- * @property CarbonImmutable        $created_at
- * @property CarbonImmutable        $updated_at
+ * @property int $id
+ * @property string $keystoneable_type
+ * @property int|string $keystoneable_id
+ * @property string|null $tenant_id
+ * @property string $name
+ * @property string|null $description Extended notes beyond the short name.
+ * @property string $client Plain public identifier sent by consumers.
+ * @property string $secret Plain HMAC-SHA256 signing secret.
+ * @property array<int,string>|null $scopes Allowed operation scopes, e.g. ['read','write'].
+ * @property array<int,string>|null $ip_allowlist Only these IPs may use this key.
+ * @property array<int,string>|null $ip_blocklist These IPs are always rejected.
+ * @property int|null $rate_limit Per-minute request cap (null = global default).
+ * @property array<string,mixed>|null $metadata Arbitrary key/value tags for filtering and auditing.
+ * @property CarbonImmutable|null $expires_at Null means the key never expires.
+ * @property CarbonImmutable|null $grace_expires_at A revoked key is still valid until this datetime.
+ * @property CarbonImmutable|null $revoked_at Non-null stamps the key as soft-revoked.
+ * @property CarbonImmutable $created_at
+ * @property CarbonImmutable $updated_at
  * @property-read Model|null        $keystoneable
  *
  * @use TenantAware<self>
@@ -57,14 +57,14 @@ class Keystone extends Model
 
     /** @var array<string, string> */
     protected $casts = [
-        'scopes'           => 'array',
-        'ip_allowlist'     => 'array',
-        'ip_blocklist'     => 'array',
-        'metadata'         => 'array',
-        'rate_limit'       => 'integer',
-        'expires_at'       => 'immutable_datetime',
+        'scopes' => 'array',
+        'ip_allowlist' => 'array',
+        'ip_blocklist' => 'array',
+        'metadata' => 'array',
+        'rate_limit' => 'integer',
+        'expires_at' => 'immutable_datetime',
         'grace_expires_at' => 'immutable_datetime',
-        'revoked_at'       => 'immutable_datetime',
+        'revoked_at' => 'immutable_datetime',
     ];
 
     /**
