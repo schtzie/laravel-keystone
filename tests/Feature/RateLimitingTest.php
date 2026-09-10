@@ -151,3 +151,50 @@ it('handles string numeric rate limit values correctly', function () {
     $response->assertHeader('X-Keystone-RateLimit-Limit', '3');
     $response->assertHeader('X-Keystone-RateLimit-Remaining', '2');
 });
+
+it('enforces a global daily rate limit when configured', function () {
+    config(['keystone.rate_limit' => null]); // Disable per-minute limit
+    config(['keystone.rate_limit_daily' => 2]);
+
+    $user = User::create(['name' => 'Test Daily']);
+    $key = $user->createKeystone('Daily Limit Key');
+
+    RateLimiter::clear('keystone:rate_limit_daily:'.$key['model']->id);
+
+    // Request 1
+    $response1 = getProtectedRateLimit($this, $key);
+    $response1->assertOk();
+
+    // Request 2
+    $response2 = getProtectedRateLimit($this, $key);
+    $response2->assertOk();
+
+    // Request 3 (exceeds daily limit)
+    $response3 = getProtectedRateLimit($this, $key);
+    $response3->assertStatus(429);
+    $response3->assertJson(['message' => 'Too many requests.']);
+    $response3->assertHeader('X-Keystone-RateLimit-Limit', '2');
+    $response3->assertHeader('X-Keystone-RateLimit-Remaining', '0');
+    $this->assertTrue($response3->headers->has('Retry-After'));
+});
+
+it('enforces whichever rate limit is hit first (minute or daily)', function () {
+    config(['keystone.rate_limit' => 10]); // Generous per-minute limit
+    config(['keystone.rate_limit_daily' => 1]); // Strict daily limit
+
+    $user = User::create(['name' => 'Test Combo']);
+    $key = $user->createKeystone('Combo Limit Key');
+
+    RateLimiter::clear('keystone:rate_limit:'.$key['model']->id);
+    RateLimiter::clear('keystone:rate_limit_daily:'.$key['model']->id);
+
+    // Request 1 succeeds (uses 1 from minute, 1 from daily)
+    $response1 = getProtectedRateLimit($this, $key);
+    $response1->assertOk();
+
+    // Request 2 throttled by DAILY limit (since daily allows only 1)
+    $response2 = getProtectedRateLimit($this, $key);
+    $response2->assertStatus(429);
+    // When rate limited by daily, the limit header should be 1
+    $response2->assertHeader('X-Keystone-RateLimit-Limit', '1');
+});

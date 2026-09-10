@@ -16,3 +16,8 @@ parameters:
 
     ignoreErrors:
         - '#Trait .* is used zero times and is not analysed#'
+        # HasKeystones methods (createKeystone, rotateKeystone) are mixed into Eloquent
+        # models via the trait. PHPStan resolves the Model base class as stdClass when
+        # it cannot statically determine the concrete class from find() or polymorphic
+        # relations. Suppress the unknown-parameter errors on those dynamic call sites.
+        - '#Unknown parameter \$(name|scopes|expiresAt|options) in call to method stdClass::createKeystone\(\)#'

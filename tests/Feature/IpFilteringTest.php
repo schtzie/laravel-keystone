@@ -59,3 +59,17 @@ it('supports CIDR notation in allowlist', function () {
     getProtectedIp($this, $key, ['REMOTE_ADDR' => '10.0.0.1'])
         ->assertForbidden();
 });
+
+it('gracefully handles missing IP columns for backwards compatibility', function () {
+    // Drop the columns to simulate an older v2.2.x database schema
+    Illuminate\Support\Facades\Schema::table(config('keystone.table', 'keystoneables'), function (Illuminate\Database\Schema\Blueprint $table) {
+        $table->dropColumn(['ip_allowlist', 'ip_blocklist']);
+    });
+
+    $user = User::create(['name' => 'Test']);
+    $key = $user->createKeystone('Backwards Compat Key');
+
+    // The middleware should successfully authenticate without crashing or throwing SQL errors
+    getProtectedIp($this, $key, ['REMOTE_ADDR' => '127.0.0.1'])
+        ->assertOk();
+});

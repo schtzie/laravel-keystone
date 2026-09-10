@@ -1,0 +1,57 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Addendum migration for existing Keystone installations.
+ *
+ * Adds the columns introduced in the v2 enhancement release to an already-
+ * existing `keystoneables` table without requiring a full table rebuild:
+ *
+ *   - `metadata`         (JSON, nullable)  — Arbitrary key/value tags for
+ *                                            labelling or filtering keys
+ *                                            (e.g. {"env":"prod","team":"backend"}).
+ *   - `description`      (string, nullable) — Extended human-readable notes
+ *                                            beyond the short `name` label.
+ *   - `grace_expires_at` (timestamp, nullable) — When set, a revoked key remains
+ *                                            valid until this datetime, giving
+ *                                            consumers a zero-downtime migration
+ *                                            window after key rotation.
+ *
+ * Publish this migration for new-column-only upgrades via:
+ *   php artisan vendor:publish --tag=keystone-migrations-enhancements
+ *
+ * For brand-new installations use `keystone-migrations` instead — those stubs
+ * already include all columns.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table(config('keystone.table', 'keystoneables'), function (Blueprint $table): void {
+            // Arbitrary metadata — flexible tagging without schema changes
+            $table->json('metadata')->nullable()->after('rate_limit');
+
+            // Extended description for management UIs and audit logs
+            $table->string('description')->nullable()->after('name');
+
+            // Zero-downtime rotation: the revoked predecessor key stays valid until this time
+            $table->timestamp('grace_expires_at')->nullable()->after('expires_at');
+
+            // Index to support expiry-rotation queries efficiently
+            $table->index('expires_at', 'keystoneables_expires_at_index');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table(config('keystone.table', 'keystoneables'), function (Blueprint $table): void {
+            $table->dropIndex('keystoneables_expires_at_index');
+            $table->dropColumn(['metadata', 'description', 'grace_expires_at']);
+        });
+    }
+};

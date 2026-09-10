@@ -228,7 +228,7 @@ describe('A — Authentication & Signature', function () {
         $key = edgeKey($user);
 
         // Hard delete the owner directly from the database to bypass Eloquent events
-        \Illuminate\Support\Facades\DB::table('users')->where('id', $user->id)->delete();
+        Illuminate\Support\Facades\DB::table('users')->where('id', $user->id)->delete();
 
         // Flush the resolved cache so it pulls the owner fresh
         app(Schtzie\Keystone\Services\KeystoneService::class)->flushResolved();
@@ -248,8 +248,9 @@ describe('A — Authentication & Signature', function () {
 
         // Mock the Request object so ip() returns null
         $this->app->bind(Illuminate\Http\Request::class, function () {
-            $request = \Illuminate\Http\Request::create('/edge', 'GET');
+            $request = Illuminate\Http\Request::create('/edge', 'GET');
             $request->server->set('REMOTE_ADDR', null);
+
             return $request;
         });
 
@@ -260,18 +261,18 @@ describe('A — Authentication & Signature', function () {
                 'X-API-Signature' => hash_hmac('sha256', $key['client'], $key['secret']),
             ])
             ->getJson('/edge');
-        
+
         $response->assertOk();
     });
 
     /**
-     * Bug: Passing an array payload to the client or signature query params 
+     * Bug: Passing an array payload to the client or signature query params
      * should gracefully return a 401 rather than throwing a type error in is_string checks.
      */
     it('returns 401 when the client or signature is passed as an array via query param', function () {
         $user = edgeUser();
         $key = edgeKey($user);
-        
+
         // Pass client as an array via query param
         $this->getJson('/edge?client[]='.$key['client'])
             ->assertUnauthorized();
@@ -452,7 +453,7 @@ describe('C — Rate Limiting', function () {
     });
 
     /**
-     * Feature: Individual keystone rate limit value should take priority over 
+     * Feature: Individual keystone rate limit value should take priority over
      * the global rate limit setting.
      */
     it('uses individual keystone rate_limit even though global rate limit is set', function () {
@@ -672,7 +673,7 @@ describe('D — Cache Layer', function () {
         $user = edgeUser();
         $key = edgeKey($user);
         $cache = app(KeystoneKeyCacheRepository::class);
-        $store = app(\Illuminate\Contracts\Cache\Repository::class);
+        $store = app(Illuminate\Contracts\Cache\Repository::class);
 
         // Simulate corrupted JSON in the owner index array store fallback
         $ownerEntry = config('keystone.cache.prefix', 'keystone').':owner:'.get_class($user).':'.$user->id;
@@ -688,25 +689,26 @@ describe('D — Cache Layer', function () {
     });
 
     /**
-     * Bug: If tenancy mode is enabled but the tenant object is missing or invalid, 
+     * Bug: If tenancy mode is enabled but the tenant object is missing or invalid,
      * tenantSegment() should safely fall back to an empty string instead of throwing a fatal error.
      */
     it('safely falls back to empty string when tenant object is invalid but tenancy is enabled', function () {
         config(['keystone.tenancy.mode' => 'single_db']);
-        
+
         // tenant() helper doesn't exist natively in standard Laravel without Stancl/Tenancy
         // If it doesn't exist, tenantSegment() returns ''
         // If we mock it to return an invalid object, it should also return ''
-        
+
         if (! function_exists('tenant')) {
-            function tenant() {
+            function tenant()
+            {
                 return (object) ['id' => 1]; // Missing getTenantKey() method
             }
         }
 
         $cache = app(KeystoneKeyCacheRepository::class);
         $segment = $cache->tenantSegment();
-        
+
         $this->assertSame('', $segment);
     });
 
@@ -928,7 +930,7 @@ describe('E — Key Lifecycle', function () {
 
         // Owner A attempts to revoke Owner B's key by ID
         $ownerA->revokeKeystone($keyB['model']->id);
-    })->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+    })->throws(Illuminate\Database\Eloquent\ModelNotFoundException::class);
 
     /**
      * Bug: rotateKeystone should throw ModelNotFoundException if the ID belongs
@@ -942,10 +944,10 @@ describe('E — Key Lifecycle', function () {
 
         // Owner A attempts to rotate Owner B's key by ID
         $ownerA->rotateKeystone($keyB['model']->id);
-    })->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+    })->throws(Illuminate\Database\Eloquent\ModelNotFoundException::class);
 
     /**
-     * Feature: Deleting an owner model should automatically delete its keystones 
+     * Feature: Deleting an owner model should automatically delete its keystones
      * via the bootHasKeystones trait event handler.
      */
     it('automatically cascades deletion to keystones when the owner is hard deleted', function () {
@@ -964,7 +966,7 @@ describe('E — Key Lifecycle', function () {
         $owner->delete();
 
         // Database records should be gone
-        expect(\Schtzie\Keystone\Models\Keystone::where('id', $key['model']->id)->exists())->toBeFalse();
+        expect(Schtzie\Keystone\Models\Keystone::where('id', $key['model']->id)->exists())->toBeFalse();
 
         // Cache should be evicted
         expect($cache->get($key['client']))->toBeNull();
@@ -1025,22 +1027,34 @@ describe('F — Key Generation', function () {
     });
 
     /**
-     * Bug: createKeystone() called with $scopes = [] should NOT fall back to
+     * Bug Fix: createKeystone() called with $scopes = [] should NOT fall back to
      * the default_scopes config if it is set. An explicit empty array should
      * override the default.
      *
-     * Note: the current implementation uses `$scopes ?: config(...)` which
-     * means an empty array DOES fall back. This test documents the behaviour.
+     * By changing the signature to `?array $scopes = null`, the package can now
+     * distinguish between an omitted parameter (which triggers the default) and
+     * an explicitly passed empty array.
      */
-    it('falls back to default_scopes config when an empty scopes array is passed', function () {
+    it('allows an explicit empty scopes array to override the default_scopes config', function () {
         config(['keystone.default_scopes' => ['read']]);
 
         $user = edgeUser();
-        $key = $user->createKeystone('Scoped Key', []); // empty → fallback
+        $key = $user->createKeystone('Scoped Key', []); // explicitly empty
         $model = $key['model'];
 
-        // With current `?: config(...)` behaviour, empty triggers default
-        expect($model->scopes)->toBe(['read']);
+        // Should be empty array, ignoring the default 'read' config
+        expect($model->scopes)->toBe([]);
+    })->after(fn () => config(['keystone.default_scopes' => []]));
+
+    it('falls back to default_scopes config when scopes parameter is omitted', function () {
+        config(['keystone.default_scopes' => ['write']]);
+
+        $user = edgeUser();
+        $key = $user->createKeystone('Omitted Scopes Key'); // omitted parameter
+        $model = $key['model'];
+
+        // Should fall back to the config
+        expect($model->scopes)->toBe(['write']);
     })->after(fn () => config(['keystone.default_scopes' => []]));
 
 });
@@ -1317,7 +1331,7 @@ describe('H — Config / Environment', function () {
     })->after(fn () => config(['keystone.guard' => null, 'auth.guards.api' => null]));
 
     /**
-     * Bug: When keystone.guard is set to an array containing invalid or non-existent 
+     * Bug: When keystone.guard is set to an array containing invalid or non-existent
      * guard names, the middleware should gracefully ignore them instead of crashing.
      */
     it('gracefully ignores invalid or non-existent guards when keystone.guard is configured', function () {
