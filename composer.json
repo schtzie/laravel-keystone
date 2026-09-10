@@ -43,7 +43,8 @@
         "pestphp/pest": "^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0",
         "predis/predis": "^3.6",
-        "stancl/tenancy": "dev-master"
+        "stancl/jobpipeline": "^2.0@rc",
+        "stancl/tenancy": "dev-master@dev"
     },
     "autoload": {
         "psr-4": {
@@ -85,6 +86,6 @@
         },
         "sort-packages": true
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }
