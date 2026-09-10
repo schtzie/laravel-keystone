@@ -53,11 +53,16 @@ function setupCacheStore(string $store): void
         } else {
             config(['keystone.cache.store' => $store]);
         }
-        Cache::store($store)->has('ping');
+
+        if ($store !== 'null') {
+            Cache::store($store)->put('ping', 'pong', 10);
+            if (Cache::store($store)->get('ping') !== 'pong') {
+                test()->markTestSkipped("Store [$store] is not responding.");
+            }
+        }
     } catch (Throwable $e) {
         test()->markTestSkipped("Store [$store] is not available: {$e->getMessage()}");
     }
-
     app()->forgetInstance(KeystoneKeyCacheRepository::class);
     app()->forgetInstance(Schtzie\Keystone\Services\KeystoneService::class);
 }
