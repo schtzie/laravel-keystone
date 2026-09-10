@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+if (! class_exists(\Stancl\Tenancy\Tenancy::class)) { return; }
+
 use Schtzie\Keystone\Testing\InteractsWithKeystone;
 use Schtzie\Keystone\Tests\Fixtures\Tenant;
 use Schtzie\Keystone\Tests\Fixtures\User;

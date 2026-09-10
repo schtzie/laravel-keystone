@@ -374,6 +374,10 @@ it('refreshes cache ttl on use if refresh_on_use is true', function (string $sto
 // ── Tenancy Cache Scenarios ──────────────────────────────────────────────
 
 it('prefixes cache keys based on tenancy mode', function (string $mode, string $expectedPrefix): void {
+    if ($mode !== 'none' && ! class_exists(\Stancl\Tenancy\Tenancy::class)) {
+        test()->markTestSkipped('Tenancy not installed');
+    }
+
     config(['keystone.tenancy.mode' => $mode]);
     app()->forgetInstance(KeystoneKeyCacheRepository::class);
 

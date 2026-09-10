@@ -14,18 +14,18 @@ abstract class TestCase extends OrchestraTestCase
 
     protected function getPackageProviders($app): array
     {
-        return [
-            \Stancl\Tenancy\TenancyServiceProvider::class,
+        return array_filter([
+            class_exists(\Stancl\Tenancy\TenancyServiceProvider::class) ? \Stancl\Tenancy\TenancyServiceProvider::class : null,
             KeystoneServiceProvider::class,
-        ];
+        ]);
     }
 
     protected function getPackageAliases($app): array
     {
-        return [
+        return array_filter([
             'Keystone'          => \Schtzie\Keystone\Facades\Keystone::class,
             'KeystoneAnalytics' => \Schtzie\Keystone\Facades\KeystoneAnalytics::class,
-        ];
+        ]);
     }
 
     /**

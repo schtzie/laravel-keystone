@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+if (! class_exists(\Stancl\Tenancy\Tenancy::class)) { return; }
+
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;

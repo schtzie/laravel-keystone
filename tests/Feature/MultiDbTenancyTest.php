@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+if (! class_exists(\Stancl\Tenancy\Tenancy::class)) { return; }
+
 use Illuminate\Support\Facades\Route;
 use Schtzie\Keystone\Cache\KeystoneKeyCacheRepository;
 use Schtzie\Keystone\Services\KeystoneService;
