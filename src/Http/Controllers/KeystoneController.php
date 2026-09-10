@@ -67,7 +67,10 @@ class KeystoneController extends Controller
      *   - scopes      (array<string>, optional)
      *   - expires_at  (string Y-m-d, optional)
      *   - description (string, optional)
-     *   - metadata    (object, optional)
+     *   - metadata     (object, optional)
+     *   - ip_allowlist (array, optional)
+     *   - ip_blocklist (array, optional)
+     *   - rate_limit   (int, optional)
      */
     public function store(Request $request): JsonResponse
     {
@@ -80,12 +83,17 @@ class KeystoneController extends Controller
         try {
             /** @var array<string, mixed> $validated */
             $validated = $request->validate([
-                'name'        => 'required|string|max:255',
-                'scopes'      => 'sometimes|array',
-                'scopes.*'    => 'string|max:100',
-                'expires_at'  => 'sometimes|nullable|date|after:now',
-                'description' => 'sometimes|nullable|string|max:1000',
-                'metadata'    => 'sometimes|nullable|array',
+                'name'           => 'required|string|max:255',
+                'scopes'         => 'sometimes|array',
+                'scopes.*'       => 'string|max:100',
+                'expires_at'     => 'sometimes|nullable|date|after:now',
+                'description'    => 'sometimes|nullable|string|max:1000',
+                'metadata'       => 'sometimes|nullable|array',
+                'ip_allowlist'   => 'sometimes|nullable|array',
+                'ip_allowlist.*' => 'string|max:45',
+                'ip_blocklist'   => 'sometimes|nullable|array',
+                'ip_blocklist.*' => 'string|max:45',
+                'rate_limit'     => 'sometimes|nullable|integer|min:0',
             ]);
         } catch (ValidationException $e) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
@@ -97,8 +105,11 @@ class KeystoneController extends Controller
             : null;
 
         $options = array_filter([
-            'description' => $validated['description'] ?? null,
-            'metadata'    => $validated['metadata'] ?? null,
+            'description'  => $validated['description'] ?? null,
+            'metadata'     => $validated['metadata'] ?? null,
+            'ip_allowlist' => $validated['ip_allowlist'] ?? null,
+            'ip_blocklist' => $validated['ip_blocklist'] ?? null,
+            'rate_limit'   => $validated['rate_limit'] ?? null,
         ], fn ($v) => $v !== null);
 
         $nameRaw = $validated['name'] ?? '';
