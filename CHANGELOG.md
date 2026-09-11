@@ -4,6 +4,19 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] — 2026-09-11
+
+### Fixed
+- **Memcached**: Fixed missing driver and service initialization, ensuring full compatibility with the Memcached store.
+- **Octane**: Added official testing and support for the Laravel Octane cache driver (`laravel/octane`).
+- **DynamoDB**: Configured AWS SDK dependencies and mocked instances to fully test and support DynamoDB caching out of the box.
+
+### Testing
+- Updated GitHub Actions CI workflow to properly spool up `amazon/dynamodb-local` and `memcached:alpine` services.
+- Expanded Pest coverage so that all advanced caching strategies are verified rather than skipped.
+
+---
+
 ## [2.3.0] — 2026-09-10
 
 ### Fixed
@@ -382,6 +395,7 @@ Features under consideration for future releases:
 
 ---
 
+[2.3.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.3.1
 [2.3.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.3.0
 [2.2.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.2.0
 [2.1.3]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.1.3
@@ -393,4 +407,4 @@ Features under consideration for future releases:
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.3.1...HEAD

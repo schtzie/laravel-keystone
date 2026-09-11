@@ -16,6 +16,7 @@ abstract class TestCase extends OrchestraTestCase
     {
         return array_filter([
             class_exists(\Stancl\Tenancy\TenancyServiceProvider::class) ? \Stancl\Tenancy\TenancyServiceProvider::class : null,
+            class_exists(\Laravel\Octane\OctaneServiceProvider::class) ? \Laravel\Octane\OctaneServiceProvider::class : null,
             KeystoneServiceProvider::class,
         ]);
     }
@@ -51,6 +52,23 @@ abstract class TestCase extends OrchestraTestCase
         // Use the array cache driver so tests never need a real Redis instance
         $app['config']->set('cache.default', 'array');
         $app['config']->set('keystone.cache.store', 'array');
+
+        // Configure dynamodb for tests
+        $app['config']->set('cache.stores.dynamodb', [
+            'driver' => 'dynamodb',
+            'key' => 'test-key',
+            'secret' => 'test-secret',
+            'region' => 'us-east-1',
+            'table' => 'cache',
+            'endpoint' => 'http://localhost:8000',
+            'client' => [
+                'retries' => 0,
+                'http' => [
+                    'timeout' => 2,
+                    'connect_timeout' => 1,
+                ],
+            ],
+        ]);
 
         // Default: no tenancy
         $app['config']->set('keystone.tenancy.mode', 'none');

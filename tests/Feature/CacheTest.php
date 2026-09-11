@@ -44,6 +44,23 @@ function setupCacheStore(string $store): void
         });
     }
 
+    if ($store === 'dynamodb') {
+        try {
+            /** @var \Illuminate\Cache\DynamoDbStore $dynamoStore */
+            $dynamoStore = Cache::store('dynamodb')->getStore();
+            $dynamoStore->getClient()->createTable([
+                'TableName' => 'cache',
+                'KeySchema' => [['AttributeName' => 'key', 'KeyType' => 'HASH']],
+                'AttributeDefinitions' => [['AttributeName' => 'key', 'AttributeType' => 'S']],
+                'BillingMode' => 'PAY_PER_REQUEST',
+            ]);
+        } catch (\Aws\DynamoDb\Exception\DynamoDbException $e) {
+            if ($e->getAwsErrorCode() !== 'ResourceInUseException') {
+                // Ignore other connection errors here, so the ping below catches it and skips.
+            }
+        }
+    }
+
     try {
         if ($store === 'redis') {
             config(['keystone.cache.store' => 'redis']);
