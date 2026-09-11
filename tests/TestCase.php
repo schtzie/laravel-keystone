@@ -16,6 +16,7 @@ abstract class TestCase extends OrchestraTestCase
     {
         return array_filter([
             class_exists(\Stancl\Tenancy\TenancyServiceProvider::class) ? \Stancl\Tenancy\TenancyServiceProvider::class : null,
+            class_exists(\Laravel\Octane\OctaneServiceProvider::class) ? \Laravel\Octane\OctaneServiceProvider::class : null,
             KeystoneServiceProvider::class,
         ]);
     }
