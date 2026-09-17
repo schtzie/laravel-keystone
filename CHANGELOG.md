@@ -389,7 +389,6 @@ Features under consideration for future releases:
 - [x] Artisan key management commands
 - [x] REST API key management routes
 - [x] Testing helpers (fake, factory, macros)
-- [ ] Webhook signing support (outbound HMAC signing)
 - [ ] Automatic key expiry notifications
 - [ ] Dashboard UI via Filament / Livewire
 
