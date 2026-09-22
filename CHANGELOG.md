@@ -4,6 +4,23 @@ All notable changes to **Laravel Keystone** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] — 2026-09-22
+
+### Added
+
+#### Laravel Boost AI Integration
+- **Official Laravel Boost (v2.0+) AI Skills**: Introduced native package-level AI capabilities automatically discovered when users install the package and run `php artisan boost:install` or `boost:update`.
+  - **`resources/boost/guidelines/core.blade.php`**: Always-on foundational guidelines injected into agent context (`CLAUDE.md`, `AGENTS.md`), establishing core architecture principles (polymorphic key ownership, zero-database Redis caching, HMAC-SHA256 signature verification, and testing conventions).
+  - **`resources/boost/skills/laravel-keystone-development/SKILL.md`**: Modular skill for model integration with `HasKeystones`, credential generation, zero-downtime key rotation with grace periods, cascading deletions, and the full suite of 7 Artisan CLI commands.
+  - **`resources/boost/skills/keystone-authentication/SKILL.md`**: Deep-dive skill for middleware (`api.key`, `api.key.payload`), route scope enforcement, multi-language HMAC request signing (PHP, JavaScript/Node.js, Python), replay-attack protection (`X-Timestamp`), payload body integrity (`X-Body-Hash`), and an error response diagnostic matrix.
+  - **`resources/boost/skills/keystone-testing/SKILL.md`**: Dedicated testing guide for Pest and PHPUnit utilizing `InteractsWithKeystone`, `actingWithKeystone()`, `actingWithKeystoneScopes()`, test isolation with `Keystone::fake()`, and asserting security edge cases.
+  - **`resources/boost/skills/keystone-tenancy/SKILL.md`**: Multi-tenancy skill covering `stancl/tenancy` v4 integration, single-db vs multi-db setup, Redis cache key namespacing by tenant, and Octane/queue worker bootstrapper isolation.
+
+#### Developer Experience & Documentation
+- **Enriched AI Knowledge Representation**: Designed all skill documents with structured parameter tables, ASCII lifecycle and request-pipeline flowcharts, GitHub-style alert callouts (`> [!IMPORTANT]`, `> [!TIP]`, `> [!NOTE]`), and explicit ❌ Anti-Pattern vs ✅ Best Practice comparisons.
+
+---
+
 ## [2.3.1] — 2026-09-11
 
 ### Fixed
@@ -389,11 +406,13 @@ Features under consideration for future releases:
 - [x] Artisan key management commands
 - [x] REST API key management routes
 - [x] Testing helpers (fake, factory, macros)
+- [x] Laravel Boost AI skills & guidelines (`resources/boost`)
 - [ ] Automatic key expiry notifications
 - [ ] Dashboard UI via Filament / Livewire
 
 ---
 
+[2.3.2]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.3.2
 [2.3.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.3.1
 [2.3.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.3.0
 [2.2.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.2.0
@@ -406,4 +425,4 @@ Features under consideration for future releases:
 [2.0.1]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.1
 [2.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v2.0.0
 [1.0.0]: https://github.com/schtzie/laravel-keystone/releases/tag/v1.0.0
-[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/schtzie/laravel-keystone/compare/v2.3.2...HEAD
